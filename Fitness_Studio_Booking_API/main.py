@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, validator
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from datetime import datetime, timezone
+from datetime import datetime
 import pytz
 import logging
 from typing import List, Optional
@@ -137,44 +137,48 @@ def convert_utc_to_timezone(utc_dt: datetime, target_tz: str) -> tuple:
 
 # Initialize sample data
 def init_sample_data(db: Session):
-    """Initialize sample fitness classes"""
-    if db.query(FitnessClass).count() > 0:
-        return
-    
-    # Create sample classes in IST, store as UTC
+    """Initialize sample fitness classes with fresh data"""
+    # Clear existing data
+    db.query(FitnessClass).delete()
+    db.commit()
+    logger.info("Old fitness class records deleted")
+
+    # Define sample classes in IST timezone
     ist = pytz.timezone("Asia/Kolkata")
     sample_classes = [
         {
             "name": "Morning Yoga",
             "instructor": "Priya Sharma",
-            "datetime_ist": datetime(2025, 6, 6, 7, 0),  # 7:00 AM IST
+            "datetime_ist": datetime(2025, 6, 9, 7, 0),  # 7:00 AM IST (future date)
             "total_slots": 15
         },
         {
             "name": "Evening Zumba",
             "instructor": "Rahul Kumar",
-            "datetime_ist": datetime(2025, 6, 6, 18, 30),  # 6:30 PM IST
+            "datetime_ist": datetime(2025, 6, 9, 18, 30),  # 6:30 PM IST
             "total_slots": 20
         },
         {
             "name": "HIIT Workout",
             "instructor": "Anjali Patel",
-            "datetime_ist": datetime(2025, 6, 7, 6, 30),  # 6:30 AM IST
+            "datetime_ist": datetime(2025, 6, 10, 6, 30),  # 6:30 AM IST
             "total_slots": 12
         },
         {
             "name": "Power Yoga",
             "instructor": "Vikram Singh",
-            "datetime_ist": datetime(2025, 6, 7, 19, 0),  # 7:00 PM IST
+            "datetime_ist": datetime(2025, 6, 10, 19, 0),  # 7:00 PM IST
             "total_slots": 18
         }
     ]
-    
+
     for class_data in sample_classes:
-        # Convert IST to UTC for storage
+        # Convert IST to UTC
         ist_dt = ist.localize(class_data["datetime_ist"])
         utc_dt = ist_dt.astimezone(pytz.UTC).replace(tzinfo=None)
-        
+
+        logger.info(f"Seeding class '{class_data['name']}' at {ist_dt} IST / {utc_dt} UTC")
+
         fitness_class = FitnessClass(
             name=class_data["name"],
             instructor=class_data["instructor"],
@@ -183,9 +187,9 @@ def init_sample_data(db: Session):
             available_slots=class_data["total_slots"]
         )
         db.add(fitness_class)
-    
+
     db.commit()
-    logger.info("Sample data initialized")
+    logger.info("Sample fitness classes seeded successfully")
 
 # API Endpoints
 @app.get("/", tags=["Health"])
@@ -205,40 +209,56 @@ async def get_classes(
     - Returns classes with times converted to the specified timezone
     """
     try:
+        logger.info(f"Getting classes for timezone: {timezone}")
+        
         # Initialize sample data if needed
         init_sample_data(db)
         
-        # Get all active classes
+        # Get all active classes (remove future time filter for debugging)
         classes = db.query(FitnessClass).filter(
-            FitnessClass.is_active == True,
-            FitnessClass.datetime_utc > datetime.utcnow()
+            FitnessClass.is_active == True
         ).order_by(FitnessClass.datetime_utc).all()
         
-        if not classes:
-            logger.info("No upcoming classes found")
+        logger.info(f"Found {len(classes)} total classes in database")
+        
+        # Filter for future classes
+        now = datetime.utcnow()
+        future_classes = [cls for cls in classes if cls.datetime_utc > now]
+        
+        logger.info(f"Found {len(future_classes)} future classes")
+        
+        if not future_classes:
+            logger.warning("No upcoming classes found")
+            # Return empty list but log the classes that exist
+            for cls in classes:
+                logger.info(f"Class: {cls.name} at {cls.datetime_utc} UTC (past: {cls.datetime_utc <= now})")
             return []
         
         # Convert times to requested timezone
         response_classes = []
-        for cls in classes:
-            local_dt, tz_name = convert_utc_to_timezone(cls.datetime_utc, timezone)
-            
-            response_classes.append(ClassResponse(
-                id=cls.id,
-                name=cls.name,
-                instructor=cls.instructor,
-                datetime_local=local_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                timezone=tz_name,
-                available_slots=cls.available_slots,
-                total_slots=cls.total_slots
-            ))
+        for cls in future_classes:
+            try:
+                local_dt, tz_name = convert_utc_to_timezone(cls.datetime_utc, timezone)
+                
+                response_classes.append(ClassResponse(
+                    id=cls.id,
+                    name=cls.name,
+                    instructor=cls.instructor,
+                    datetime_local=local_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                    timezone=tz_name,
+                    available_slots=cls.available_slots,
+                    total_slots=cls.total_slots
+                ))
+            except Exception as e:
+                logger.error(f"Error processing class {cls.id}: {str(e)}")
+                continue
         
-        logger.info(f"Retrieved {len(response_classes)} classes for timezone {timezone}")
+        logger.info(f"Returning {len(response_classes)} classes for timezone {timezone}")
         return response_classes
         
     except Exception as e:
-        logger.error(f"Error retrieving classes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error retrieving classes: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/book", response_model=BookingResponse, tags=["Bookings"])
 async def book_class(booking: BookingRequest, db: Session = Depends(get_db)):

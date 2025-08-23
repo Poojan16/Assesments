@@ -1,0 +1,122 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<div class="row g-3 align-items-end">
+  <div class="col-md-4">
+    <label for="machineSelect" class="form-label">Machine</label>
+    <select id="machineSelect" class="form-select">
+      {% for m in machines %}
+      <option value="{{ m.hostname }}">{{ m.hostname }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Latest Snapshot</label>
+    <div id="snapshotTime" class="form-control-plaintext">—</div>
+  </div>
+  <div class="col-md-4 text-md-end">
+    <button id="refreshBtn" class="btn btn-primary">Refresh</button>
+  </div>
+</div>
+<hr />
+<div id="treeContainer" class="tree"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const machineSelect = document.getElementById('machineSelect');
+  const snapshotTimeEl = document.getElementById('snapshotTime');
+  const treeContainer = document.getElementById('treeContainer');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  async function fetchLatest(hostname) {
+    const resp = await fetch(`/api/latest/${encodeURIComponent(hostname)}/`);
+    if (!resp.ok) {
+      treeContainer.innerHTML = `<div class="alert alert-warning">${(await resp.json()).detail || 'No data'}</div>`;
+      snapshotTimeEl.textContent = '—';
+      return null;
+    }
+    return resp.json();
+  }
+
+  function buildTree(processes) {
+    const byPid = new Map();
+    const children = new Map();
+    processes.forEach(p => {
+      byPid.set(p.pid, p);
+      children.set(p.pid, []);
+    });
+    const roots = [];
+    processes.forEach(p => {
+      if (byPid.has(p.ppid)) {
+        children.get(p.ppid).push(p);
+      } else {
+        roots.push(p);
+      }
+    });
+
+    function createNode(p) {
+      const li = document.createElement('li');
+      const hasKids = (children.get(p.pid) || []).length > 0;
+      const toggle = document.createElement('span');
+      toggle.className = 'toggle me-1';
+      toggle.textContent = hasKids ? '▾' : '';
+      const label = document.createElement('span');
+      label.innerHTML = `<strong>${p.name}</strong> <span class="pid">(pid ${p.pid}, ppid ${p.ppid})</span> — CPU ${p.cpu_percent.toFixed(1)}% • RSS ${formatBytes(p.memory_rss)} • MEM ${p.memory_percent.toFixed(1)}%`;
+      li.appendChild(toggle);
+      li.appendChild(label);
+
+      if (hasKids) {
+        const ul = document.createElement('ul');
+        children.get(p.pid).sort((a,b) => a.pid - b.pid).forEach(c => ul.appendChild(createNode(c)));
+        li.appendChild(ul);
+        toggle.addEventListener('click', () => {
+          const visible = ul.style.display !== 'none';
+          ul.style.display = visible ? 'none' : '';
+          toggle.textContent = visible ? '▸' : '▾';
+        });
+      }
+      return li;
+    }
+
+    const ul = document.createElement('ul');
+    roots.sort((a,b) => a.pid - b.pid).forEach(r => ul.appendChild(createNode(r)));
+    return ul;
+  }
+
+  function formatBytes(bytes) {
+    const thresh = 1024;
+    if (Math.abs(bytes) < thresh) {
+      return bytes + ' B';
+    }
+    const units = ['KB','MB','GB','TB'];
+    let u = -1;
+    do {
+      bytes /= thresh;
+      ++u;
+    } while (Math.abs(bytes) >= thresh && u < units.length - 1);
+    return bytes.toFixed(1)+' '+units[u];
+  }
+
+  async function refresh() {
+    const host = machineSelect.value;
+    if (!host) { return; }
+    const data = await fetchLatest(host);
+    if (!data) { return; }
+    snapshotTimeEl.textContent = new Date(data.snapshot_time).toLocaleString();
+    treeContainer.innerHTML = '';
+    treeContainer.appendChild(buildTree(data.processes));
+  }
+
+  refreshBtn.addEventListener('click', refresh);
+  if (machineSelect) {
+    machineSelect.addEventListener('change', refresh);
+  }
+
+  if (machineSelect && machineSelect.value) {
+    refresh();
+  }
+})();
+</script>
+{% endblock %} 

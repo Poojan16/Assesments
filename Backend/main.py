@@ -19,67 +19,37 @@ from typing import List, Union
 from uploadFile import decrypt_file, upload_and_encrypt_file
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 import random
-from redis_client import redis_client,get_reset_token
+from redis_client import redis_client,get_reset_token       
 import logging
 from services.paymentConfig import *
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-    
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle application startup and shutdown"""
+    scheduler = AsyncIOScheduler()
+    # scheduler.add_job(
+    #     schedule_annual_notifications,
+    #     IntervalTrigger(minutes=10),  
+    #     id="hourly_notification_check",
+    #     replace_existing=True
+    # )
+    central_email_service = CentralEmailService(SessionLocal(), EmailNotificationSystem(SessionLocal()))
+    scheduler.add_job(
+        central_email_service.central_email_system,
+        IntervalTrigger(minutes=1),  
+        id="hourly_email_check",
+        replace_existing=True
+    )
+    scheduler.start()
+    yield
+    scheduler.shutdown()
     
-    # Startup
-    logger.info("Starting up application...")
     
-    # Initialize email sender
-    await email_sender.initialize()
     
-    # Initialize scheduler in background
-    async def init_scheduler():
-        global notification_scheduler
-        db = SessionLocal()
-        try:
-            notification_scheduler = NotificationScheduler(email_sender, db)
-            notification_scheduler.start()
-            
-            # Schedule annual notifications
-            await schedule_annual_notifications(notification_scheduler.scheduler)
-            
-        finally:
-            db.close()
-    
-    asyncio.create_task(init_scheduler())
-    
-    yield  # App runs here
-    
-    # Shutdown
-    logger.info("Shutting down application...")
-    
-    if notification_scheduler:
-        notification_scheduler.stop()
-    
-    await email_sender.shutdown()
-    
-    logger.info("Application shutdown complete")    
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """Handles application startup and shutdown events."""
-    
-#     try:
-#         await redis_client.ping()
-#         print("✅ Redis connected")
-#     except Exception as e:
-#         print("❌ Redis connection failed:", e)
-
-#     yield  # App runs here
-
-#     # Shutdown
-#     await redis_client.close()
-#     print("🔻 Redis connection closed")
-
 # FastAPI app    
 app = FastAPI(
     lifespan=lifespan,
@@ -88,11 +58,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-@app.on_event("startup")
-async def startup():
-    await redis_client.ping()
-    print("✅ Redis connected")
 
+        
 @app.on_event("shutdown")
 async def shutdown():
     await redis_client.close()
@@ -118,18 +85,7 @@ app.include_router(classes.router)
 app.include_router(subjects.router)
 app.include_router(student.router)
 app.include_router(audit.router)
-app.include_router(paymentConfig.router)
 
-
-
-# Include the router from roles.py
-# You can add a prefix and tags here, which will apply to all routes in the roles router
-
-@app.get("/testing")
-async def testing(student_id: int ):
-    db = SessionLocal
-    sender =  EnhancedBatchEmailSender(redis_manager=redis_manager)
-    return await sender.prepare_student_email_data(student_id,db)
 
 @app.get("/tokens")
 async def get_reset_token():
@@ -293,7 +249,8 @@ async def Central_email_testing(
     attachment: Optional[UploadFile] = File(None),
     metadatas: Any = None,
     max_retries: int = 3,
-    retry_interval: int = 300
+    retry_interval: int = 300,
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     email_data = EmailRequest(
         emails=[email],
@@ -306,7 +263,7 @@ async def Central_email_testing(
     )
 
     try:
-        response = await send_email_with_retry(email_data)
+        response = await send_email_with_retry(email_data,background_tasks)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -387,3 +344,22 @@ async def add_bulk_student_score():
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     finally:
         db.close()
+  
+@app.get("/schedule-annual-notifications")      
+async def schedule_notitfication():
+    result = await schedule_annual_notifications()
+    return result
+
+@app.post("/background-test")
+async def background_testing(background_tasks: BackgroundTasks, metadatas: Optional[dict] = None):
+    db = SessionLocal()
+    email = CentralEmailService(db, EmailNotificationSystem(db))
+    emailRequest = EmailSchemaForRetry(
+        emails=['pujansoni.jcasp@gmail.com'],
+        subject="Testing background task",
+        body="Testing the background tasks",
+        attachment=None,
+        metadatas=metadatas
+    )
+    background_tasks.add_task(email._send_message_with_retry_and_rate_limit, emailRequest, metadatas)
+    return {"message": "Email sending initiated in the background"}

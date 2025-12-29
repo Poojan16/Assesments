@@ -320,24 +320,30 @@ class Fees(Base):
     created_at = Column(TIMESTAMP, default=datetime.now())
     DModify = Column(TIMESTAMP, default=datetime.now())
     
+class EmailPriority(enum.Enum):
+    LOW = 0
+    NORMAL = 1
+    HIGH = 2
+    
 class EmailLog(Base):
     __tablename__ = "email_logs"
 
     email_id = Column(Integer, primary_key=True)
     to = Column(String(255), nullable=False)
     subject = Column(String(255), nullable=False)
-    body = Column(String(255), nullable=False)
+    body = Column(String(7000), nullable=False)
     attachment = Column(String(255), nullable=True, default=None)
     status = Column(SQLEnum(EmailStatus), default=EmailStatus.PENDING)
+    priority = Column(SQLEnum(EmailPriority), default=EmailPriority.LOW)
     retry_count = Column(Integer, default=0)
     max_retries = Column(Integer, default=3)
-    retry_interval = Column(Integer, default=300)  # 5 minutes in seconds
+    retry_interval = Column(Integer, default=300) 
     last_attempt = Column(TIMESTAMP, nullable=True)
     error_details = Column(String(500), nullable=True)
     modify_by = Column(Integer, ForeignKey("teachers.teacherId"), nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.now)
     modified_at = Column(TIMESTAMP, default=datetime.now, onupdate=datetime.now)
-    metadatas = Column(JSON, nullable=True)  # For additional tracking info
+    metadatas = Column(JSON, nullable=True) 
     
     @property
     def can_retry(self):

@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from enum import Enum
 import asyncio
 import logging
+import time
 from pydantic import BaseModel, EmailStr
 from fastapi_mail import FastMail, MessageSchema, MessageType
 from contextlib import contextmanager
 import os
 from dotenv import load_dotenv
-from pydantic import BaseModel, EmailStr
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,6 +19,23 @@ from models import *
 from sqlalchemy.orm import Session
 
 logging.basicConfig(level=logging.INFO)
+
+class EmailConfig:
+    DEFAULT_BATCH_SIZE = 50  
+    MAX_BATCH_SIZE = 100     
+    MIN_BATCH_SIZE = 10      
+    
+    SMTP_RATE_LIMIT_REQUESTS_PER_MINUTE = 100  
+    SMTP_RATE_LIMIT_REQUESTS_PER_DAY = 2000    
+    SMTP_RATE_LIMIT_RESET_WINDOW = 86400      
+    
+    INITIAL_RETRY_DELAY = 30  
+    MAX_RETRY_DELAY = 3600    
+    BACKOFF_MULTIPLIER = 2
+    
+    BATCH_PROCESSING_INTERVAL = 60 
+    
+    MAX_CONCURRENT_SMTP_CONNECTIONS = 3
 
 class EmailSchemaForRetry(BaseModel):
     emails: List[EmailStr]
@@ -32,10 +49,16 @@ class EmailRequest(BaseModel):
     subject: str
     body: str
     attachment: Optional[str] = None
+    priority: Optional[int] = 0
     metadatas: Optional[dict] = None
     max_retries: Optional[int] = 3
     retry_interval: Optional[int] = 300
+    batch_size: Optional[int] = None 
     
+class EmailSchema1(BaseModel):
+    emails: List[EmailStr]
+    subject: str
+    body: str
     
 conf = ConnectionConfig(
     MAIL_USERNAME="pujansoni.jcasp@gmail.com",
@@ -48,22 +71,62 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
-class EmailSchema1(BaseModel):
-    email: List[EmailStr]
-    subject: str
-    body: str
-
-
 SMTP_SERVER = "smtp.gmail.com"  
 SMTP_PORT = 465  
 EMAIL_ADDRESS = os.getenv("MAIL_USERNAME")
 EMAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
-
-class EmailSchema(BaseModel):
-    email: EmailStr
-    subject: str
-    body: str
-
+    
+class RateLimitTracker:
+    """Track and manage SMTP rate limiting"""
+    def __init__(self):
+        self.request_timestamps: List[float] = []
+        self.daily_request_count = 0
+        self.daily_reset_time = time.time() + EmailConfig.SMTP_RATE_LIMIT_RESET_WINDOW
+        self.last_rate_limit_hit: Optional[float] = None
+        self.consecutive_rate_limits = 0
+        
+    def can_send_request(self) -> bool:
+        """Check if we can send another request based on rate limits"""
+        current_time = time.time()
+        
+        if current_time >= self.daily_reset_time:
+            self.daily_request_count = 0
+            self.daily_reset_time = current_time + EmailConfig.SMTP_RATE_LIMIT_RESET_WINDOW
+        
+        if self.daily_request_count >= EmailConfig.SMTP_RATE_LIMIT_REQUESTS_PER_DAY:
+            logging.warning("Daily SMTP rate limit reached")
+            return False
+        
+        one_minute_ago = current_time - 60
+        self.request_timestamps = [ts for ts in self.request_timestamps if ts > one_minute_ago]
+        
+        if len(self.request_timestamps) >= EmailConfig.SMTP_RATE_LIMIT_REQUESTS_PER_MINUTE:
+            logging.warning("Per-minute SMTP rate limit reached")
+            return False
+        
+        return True
+    
+    def record_request(self):
+        """Record a successful request"""
+        current_time = time.time()
+        self.request_timestamps.append(current_time)
+        self.daily_request_count += 1
+        self.consecutive_rate_limits = 0  
+    
+    def record_rate_limit_hit(self):
+        """Record when we hit a rate limit"""
+        self.last_rate_limit_hit = time.time()
+        self.consecutive_rate_limits += 1
+    
+    def get_backoff_delay(self) -> float:
+        """Calculate exponential backoff delay"""
+        if self.consecutive_rate_limits == 0:
+            return EmailConfig.INITIAL_RETRY_DELAY
+        
+        delay = EmailConfig.INITIAL_RETRY_DELAY * (
+            EmailConfig.BACKOFF_MULTIPLIER ** (self.consecutive_rate_limits - 1)
+        )
+        return min(delay, EmailConfig.MAX_RETRY_DELAY)
 
 class EmailNotificationSystem:
     def __init__(self, db_session_factory):
@@ -102,23 +165,90 @@ class CentralEmailService:
         self.db_session_factory = db_session_factory
         self.notification_system = notification_system
         self.fm = FastMail(conf)
-        
-    @contextmanager
-    def get_db(self):
-        """Context manager for database sessions"""
-        db = self.db_session_factory()
-        try:
-            yield db
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        self.rate_limit_tracker = RateLimitTracker()
+        self.smtp_semaphore = asyncio.Semaphore(EmailConfig.MAX_CONCURRENT_SMTP_CONNECTIONS)
+        self.current_batch_size = EmailConfig.DEFAULT_BATCH_SIZE
     
-    async def log_email(self, email_request: EmailRequest, modify_by: Optional[int] = None) -> EmailLog:
+    def _validate_and_get_batch_size(self, request_batch_size: Optional[int] = None) -> int:
+        """Validate and return appropriate batch size"""
+        if request_batch_size is None:
+            return self.current_batch_size
+        
+        if request_batch_size < EmailConfig.MIN_BATCH_SIZE:
+            logging.warning(f"Batch size {request_batch_size} too small, using minimum {EmailConfig.MIN_BATCH_SIZE}")
+            return EmailConfig.MIN_BATCH_SIZE
+        elif request_batch_size > EmailConfig.MAX_BATCH_SIZE:
+            logging.warning(f"Batch size {request_batch_size} too large, using maximum {EmailConfig.MAX_BATCH_SIZE}")
+            return EmailConfig.MAX_BATCH_SIZE
+        
+        return request_batch_size
+    
+    def _adjust_batch_size_based_on_rate_limits(self):
+        """Dynamically adjust batch size based on rate limit hits"""
+        if self.rate_limit_tracker.consecutive_rate_limits > 0:
+            new_batch_size = max(
+                EmailConfig.MIN_BATCH_SIZE,
+                self.current_batch_size // 2
+            )
+            if new_batch_size != self.current_batch_size:
+                logging.info(f"Reducing batch size from {self.current_batch_size} to {new_batch_size} due to rate limits")
+                self.current_batch_size = new_batch_size
+        elif self.rate_limit_tracker.consecutive_rate_limits == 0 and \
+             time.time() - (self.rate_limit_tracker.last_rate_limit_hit or 0) > 3600:
+            new_batch_size = min(
+                EmailConfig.MAX_BATCH_SIZE,
+                self.current_batch_size + 10
+            )
+            if new_batch_size != self.current_batch_size:
+                logging.info(f"Increasing batch size from {self.current_batch_size} to {new_batch_size}")
+                self.current_batch_size = new_batch_size
+    
+    async def _handle_smtp_rate_limit_error(self, error: Exception, email_log: Optional[EmailLog] = None):
+        """Handle SMTP rate limit errors with appropriate backoff"""
+        error_msg = str(error).lower()
+        
+        rate_limit_indicators = [
+            "rate limit",
+            "rate exceeded",
+            "too many requests",
+            "quota exceeded",
+            "421 4.7.0", 
+            "550 5.7.0",  
+        ]
+        
+        is_rate_limit = any(indicator in error_msg for indicator in rate_limit_indicators)
+        
+        if is_rate_limit:
+            self.rate_limit_tracker.record_rate_limit_hit()
+            backoff_delay = self.rate_limit_tracker.get_backoff_delay()
+            
+            logging.warning(
+                f"SMTP rate limit hit. Backing off for {backoff_delay} seconds. "
+                f"Consecutive hits: {self.rate_limit_tracker.consecutive_rate_limits}"
+            )
+            
+            self._adjust_batch_size_based_on_rate_limits()
+            
+            if email_log:
+                await self._schedule_retry_with_backoff(email_log, backoff_delay)
+            
+            return backoff_delay
+        
+        return None
+    
+    async def _schedule_retry_with_backoff(self, email_log: EmailLog, delay: float):
+        """Schedule email for retry with exponential backoff"""
+        async def retry_task():
+            await asyncio.sleep(delay)
+            await self.retry_failed_email(email_log.email_id)
+            logging.info(f"Retry for email {email_log.email_id} completed after {delay} second backoff")
+        
+        asyncio.create_task(retry_task())
+        logging.info(f"Scheduled retry for email {email_log.email_id} in {delay} seconds with backoff")
+    
+    async def log_email(self, email_request: EmailRequest, modify_by: Optional[int] = None) -> int:
         """Log email attempt in database"""
-        with self.get_db() as db:
+        with self.db_session_factory as db:
             email_log = EmailLog(
                 to=",".join(email_request.emails),
                 subject=email_request.subject,
@@ -133,87 +263,142 @@ class CentralEmailService:
                 modified_at=datetime.now()
             )
             db.add(email_log)
-            db.flush()
             db.commit()
+            db.refresh(email_log)
             return email_log.email_id
     
     async def send_email(self, email_schema: EmailSchemaForRetry, background_tasks: BackgroundTasks) -> bool:
-        """Send email with background task"""
+        """Send email with background task and batch consideration"""
         try:
             logging.info(email_schema)
-            message = MessageSchema(
-                subject=email_schema.subject,
-                recipients=email_schema.emails,
-                body=email_schema.body,
-                subtype=MessageType.plain
-            )
             
-            if email_schema.attachment:
-                message.attachments = [(email_schema.attachment, None)]
+            emails = email_schema.emails
+            batch_size = self._validate_and_get_batch_size()
             
-            # Add to background tasks for async sending
-            background_tasks.add_task(self._send_message_with_retry, message, email_schema.metadatas)
-            # await self._send_message_with_retry( message, email_schema.metadatas)
-            logging.info("Email queued for sending in the background")
+            if len(emails) > batch_size:
+                for i in range(0, len(emails), batch_size):
+                    batch_emails = emails[i:i + batch_size]
+                    batch_schema = EmailSchemaForRetry(
+                        emails=batch_emails,
+                        subject=email_schema.subject,
+                        body=email_schema.body,
+                        attachment=email_schema.attachment,
+                        metadatas=email_schema.metadatas
+                    )
+                    
+                    # Add each batch to background tasks
+                    background_tasks.add_task(
+                        self._send_message_with_retry_and_rate_limit, 
+                        batch_schema, 
+                        email_schema.metadatas
+                    )
+            else:
+                # Single batch
+                background_tasks.add_task(
+                    self._send_message_with_retry_and_rate_limit, 
+                    email_schema, 
+                    email_schema.metadatas
+                )
+            
+            logging.info(f"Email queued for sending in {max(1, len(emails) // batch_size)} batches")
             return True
             
         except Exception as e:
             logging.error(f"Failed to queue email: {str(e)}")
             return False
     
-    async def _send_message_with_retry(self, message: MessageSchema, metadatas: Optional[dict] = None):
-        """Internal method to send email with retry logic"""
-        logging.info("Sending email with retry logic")
+    async def _send_message_with_retry_and_rate_limit(self, email_schema: EmailSchemaForRetry, metadatas: Optional[dict] = None):
+        """Internal method to send email with retry logic and rate limit handling"""
+        logging.info("Sending email with retry and rate limit logic")
         email_id = metadatas.get('email_id') if metadatas else None
-        logging.info(f"Sending email with email_id: {email_id}")
         
         if email_id:
-            with self.get_db() as db:
+            with self.db_session_factory as db:
                 email_log = db.query(EmailLog).filter(EmailLog.email_id == email_id).first()
                 if email_log:
-                    await self._attempt_send_with_retry(email_log, message, db)
-                    logging.info(f"Email with email_id: {email_id} sent successfully")
+                    await self._attempt_send_with_retry_and_rate_limit(email_log, email_schema, db)
         else:
             try:
-                await self.fm.send_message(message)
+                if not self.rate_limit_tracker.can_send_request():
+                    await asyncio.sleep(self.rate_limit_tracker.get_backoff_delay())
+                
+                async with self.smtp_semaphore:
+                    message = MessageSchema(
+                        subject=email_schema.subject,
+                        recipients=email_schema.emails,
+                        body=email_schema.body,
+                        subtype=MessageType.html
+                    )
+                    
+                    
+                    if email_schema.attachment:
+                        message.attachments = [(email_schema.attachment, None)]
+                    
+                    await self.fm.send_message(message)
+                    self.rate_limit_tracker.record_request()
+                    
             except Exception as e:
                 logging.error(f"Email send failed: {str(e)}")
+                
+                backoff_delay = await self._handle_smtp_rate_limit_error(e)
+                if backoff_delay:
+                    await asyncio.sleep(backoff_delay)
+                    asyncio.create_task(
+                        self._send_message_with_retry_and_rate_limit(email_schema, metadatas)
+                    )
     
-    async def _attempt_send_with_retry(self, email_log: EmailLog, message: MessageSchema, db: SessionLocal):
-        """Attempt to send email with retry logic"""
+    async def _attempt_send_with_retry_and_rate_limit(self, email_log: EmailLog, email_schema: EmailSchemaForRetry, db: SessionLocal):
+        """Attempt to send email with retry logic and rate limit handling"""
         try:
             email_log.status = EmailStatus.RETRYING
             email_log.retry_count += 1
             email_log.last_attempt = datetime.now()
             db.commit()
-            logging.info(f"Email {email_log.email_id} is being retried")
+            
+            if not self.rate_limit_tracker.can_send_request():
+                backoff_delay = self.rate_limit_tracker.get_backoff_delay()
+                logging.warning(f"Rate limit prevented sending email {email_log.email_id}, delaying {backoff_delay}s")
+                await self._schedule_retry_with_backoff(email_log, backoff_delay)
+                return
             
             try:
-                await self.fm.send_message(message)
+                async with self.smtp_semaphore:
+                    message = MessageSchema(
+                        subject=email_log.subject,
+                        recipients=email_log.to.split(','),
+                        body=email_log.body,
+                        subtype=MessageType.html,
+                        attachments=[(email_log.attachment, None)] if email_log.attachment else []
+                    )
+                    
+                    await self.fm.send_message(message)
+                    self.rate_limit_tracker.record_request()
+                    
+                logging.info(f"Email {email_log.email_id} sent successfully")
+                email_log.status = EmailStatus.SENT
+                email_log.modified_at = datetime.now()
+                db.commit()
+                
+                await self.notification_system.send_email_notification(email_log, success=True)
+                
             except Exception as e:
                 logging.error(f"Email {email_log.email_id} sending failed: {str(e)}")
                 
-            logging.info(f"Email {email_log.email_id} sent successfully")
-            email_log.status = EmailStatus.SENT
-            email_log.modified_at = datetime.now()
-            db.commit()
-            
-            logging.info(f"Email {email_log.email_id} sent successfully")
-            
-            await self.notification_system.send_email_notification(email_log, success=True)
-            
+                backoff_delay = await self._handle_smtp_rate_limit_error(e, email_log)
+                if backoff_delay:
+                    return  
+                
+                if email_log.can_retry:
+                    await self._schedule_retry(email_log)
+                else:
+                    email_log.status = EmailStatus.FAILED
+                    email_log.error_details = str(e)[:500]
+                    email_log.modified_at = datetime.now()
+                    db.commit()
+                    await self.notification_system.send_email_notification(email_log, success=False)
+                    
         except Exception as e:
-            email_log.status = EmailStatus.FAILED
-            email_log.error_details = str(e)[:500]  # Truncate if too long
-            email_log.modified_at = datetime.now()
-            db.commit()
-            
-            logging.error(f"Email {email_log.email_id} failed: {str(e)}")
-            
-            if email_log.can_retry:
-                await self._schedule_retry(email_log)
-            else:
-                await self.notification_system.send_email_notification(email_log, success=False)
+            logging.error(f"Error in attempt_send for email {email_log.email_id}: {str(e)}")
     
     async def _schedule_retry(self, email_log: EmailLog):
         """Schedule email for retry after interval"""
@@ -229,72 +414,85 @@ class CentralEmailService:
     
     async def retry_failed_email(self, email_id: int):
         """Retry sending a specific failed email"""
-        with self.get_db() as db:
-            email_log = db.query(EmailLog).filter(EmailLog.email_id == email_id).first()
+        logging.info(f"Retrying email {email_id}")
+        email_log = self.db_session_factory.query(EmailLog).filter(EmailLog.email_id == email_id).first()
+        logging.info(f"Retrying email {email_log}")
+        
+        if not email_log or not email_log.can_retry:
+            return
+        
+        try:
+            email_schema = EmailSchemaForRetry(
+                emails=[f"{email_log.to}"],
+                subject=email_log.subject,
+                body=email_log.body,
+                attachment=email_log.attachment,
+                metadatas={'email_id': email_id}
+            )
+            logging.info(f"sending email {email_schema}")
+            await self._send_message_with_retry_and_rate_limit(email_schema, {'email_id': email_id})
+            logging.info(f"Email {email_id} sent successfully")
             
-            if not email_log or not email_log.can_retry:
-                return
-            
-            try:
-                email_schema = EmailSchemaForRetry(
-                    emails=email_log.to.split(','),
-                    subject=email_log.subject,
-                    body=email_log.body,
-                    attachment=email_log.attachment,
-                    metadatas={'email_id': email_id}
-                )
-                
-                await self._send_message_with_retry(
-                    MessageSchema(
-                        subject=email_log.subject,
-                        recipients=email_log.to.split(','),
-                        body=email_log.body,
-                        subtype=MessageType.plain,
-                        attachments=[(email_log.attachment, None)] if email_log.attachment else []
-                    ),
-                    {'email_id': email_id}
-                )
-                
-            except Exception as e:
-                logging.error(f"Failed to retry email {email_id}: {str(e)}")
+        except Exception as e:
+            logging.error(f"Failed to retry email {email_id}: {str(e)}")
+        
     
-    async def process_pending_emails(self):
-        """Process all pending/failed emails that need retrying"""
-        with self.get_db() as db:
-            pending_emails = db.query(EmailLog).filter(
-                EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.FAILED]),
-                EmailLog.retry_count < EmailLog.max_retries
-            ).all()
-            logging.info(f"Processing {len(pending_emails)} pending/failed emails")
+    async def process_pending_emails_in_batches(self, batch_size: Optional[int] = None):
+        """Process all pending/failed emails in configurable batches"""
+        pending_emails = self.db_session_factory.query(EmailLog).filter(
+            EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.FAILED]),
+            EmailLog.retry_count < EmailLog.max_retries
+        ).all()
+        
+        logging.info(f"Found {len(pending_emails)} pending/failed emails")
+        
+        effective_batch_size = self._validate_and_get_batch_size(batch_size)
+        
+        for i in range(0, len(pending_emails), effective_batch_size):
+            batch = pending_emails[i:i + effective_batch_size]
+            logging.info(f"Processing batch {i//effective_batch_size + 1} with {len(batch)} emails")
             
-            for email_log in pending_emails:
+            tasks = []
+            for email_log in batch:
                 if (email_log.last_attempt is None or 
                     datetime.now() - email_log.last_attempt > timedelta(seconds=email_log.retry_interval)):
                     
-                    await self.retry_failed_email(email_log.email_id)
+                    if not self.rate_limit_tracker.can_send_request():
+                        backoff_delay = self.rate_limit_tracker.get_backoff_delay()
+                        logging.warning(f"Rate limit reached, delaying batch processing for {backoff_delay}s")
+                        await asyncio.sleep(backoff_delay)
+                    
+                    tasks.append(self.retry_failed_email(email_log.email_id))
             
-            logging.info("Pending/failed emails processed")
+            await asyncio.gather(*tasks, return_exceptions=True)
+            
+            if i + effective_batch_size < len(pending_emails):
+                await asyncio.sleep(1)  
+        
+        logging.info(f"Processed {len(pending_emails)} emails in batches of {effective_batch_size}")
+            
     
-    async def central_email_system(self, interval_seconds: int = 60):
-        """Continuous email processing system"""
-        logging.info("Starting central email processing system")
+    async def central_email_system(self, interval_seconds: int = 60, batch_size: Optional[int] = None):
+        """Continuous email processing system with batch support"""
+        logging.info("Starting central email processing system with batch support")
         
         while True:
             try:
-                await self.process_pending_emails()
-                logging.info("Pending/failed emails processed")
+                await self.process_pending_emails_in_batches(batch_size)
+                logging.info(f"Batch processing completed. Next run in {interval_seconds} seconds")
                 await asyncio.sleep(interval_seconds)
             except Exception as e:
                 logging.error(f"Error in central email system: {str(e)}")
                 await asyncio.sleep(interval_seconds)
 
 
-async def send_email_with_retry(email_request: EmailRequest, modify_by: Optional[int] = None):
-    db_session_factory = SessionLocal  
+async def send_email_with_retry(email_request: EmailRequest, background_tasks: BackgroundTasks, modify_by: Optional[int] = None):
+    db_session_factory = SessionLocal()
     notification_system = EmailNotificationSystem(db_session_factory)
     email_service = CentralEmailService(db_session_factory, notification_system)
     
     email_id = await email_service.log_email(email_request, modify_by)
+    logging.info(f"Email logged with ID: {email_id}")
     
     email_schema = EmailSchemaForRetry(
         emails=email_request.emails,
@@ -304,14 +502,13 @@ async def send_email_with_retry(email_request: EmailRequest, modify_by: Optional
         metadatas={'email_id': email_id}
     )
     
-    background_tasks = BackgroundTasks()
     try:
         success = await email_service.send_email(email_schema, background_tasks)
     except Exception as e:
         logging.error(f"Email send failed: {str(e)}")
         success = False
     
-    email_log = db_session_factory().query(EmailLog).filter(EmailLog.email_id == email_id).first()
+    email_log = db_session_factory.query(EmailLog).filter(EmailLog.email_id == email_id).first()
     if not success:
         email_log.status = EmailStatus.FAILED
         email_log.modified_at = datetime.now()

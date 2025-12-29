@@ -13,8 +13,9 @@ from user_agents import parse
 from database import *
 from password import *
 from dotenv import load_dotenv, find_dotenv,set_key
-
+from redis_client import save_reset_token,mark_token_used
 from routers.audit import post_user_audit
+import logging
 
 load_dotenv()
 
@@ -90,6 +91,21 @@ async def reset(email:str = Form(...),password:str = Form(...),token:str = Form(
     if(token):
         try:
             db = SessionLocal()
+            user_info = db.query(User).filter(User.userEmail == email).first()
+            user_info.password = hash_password(password)            
+            db.commit()
+            db.refresh(user_info)
+            return {
+                "status_code": 200,
+                "success": True,
+                "data": user_info,
+                "message": "Password reset successfully",
+            }
+        except Exception as e:
+            raise httpException(status_code=400, detail=str(e))
+    elif(token == ""):
+        try:
+            db = SessionLocal()
             teacher = (db.query(Teacher).filter(Teacher.teacherEmail == email).first())
             user_info = User(
                 userName=teacher.teacherName,
@@ -108,21 +124,7 @@ async def reset(email:str = Form(...),password:str = Form(...),token:str = Form(
             }
         except Exception as e:
             raise httpException(status_code=400, detail=str(e))
-    elif(token == ""):
-        try:
-            db = SessionLocal()
-            user_info = db.query(User).filter(User.userEmail == email).first()
-            user_info.password = hash_password(password)            
-            db.commit()
-            db.refresh(user_info)
-            return {
-                "status_code": 200,
-                "success": True,
-                "data": user_info,
-                "message": "Password reset successfully",
-            }
-        except Exception as e:
-            raise httpException(status_code=400, detail=str(e))
+        
 
 async def send_otp(email:str):
     try:
@@ -145,7 +147,7 @@ async def send_otp(email:str):
     
 async def resetPassword(token:str):
     try:
-        decode = decode_expiring_link_token(token)
+        decode = await decode_expiring_link_token(token)
         print(decode)
         db = SessionLocal()
         if(decode['type'] == "reset_password"):
@@ -194,7 +196,7 @@ async def link_check(email: str):
         expiry_time = timedelta(minutes=expiry_minutes)
         
         # Create token with email embedded
-        token = create_expiring_link_token(email, expiry_time)
+        token = await create_expiring_link_token(email, expiry_time)
         
         return {
             "status_code": 200,
@@ -214,7 +216,8 @@ async def link_check(email: str):
 
 async def decodelink(link):
     try:
-        decode = decode_expiring_link_token(link)
+        decode = await decode_expiring_link_token(link)
+        await mark_token_used(link)
         return {
             "status_code": 200,
             "success": True,

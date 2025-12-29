@@ -5,7 +5,7 @@ import {
   FileText, Send, ZoomIn, ZoomOut, CheckCircle, XCircle, MessageSquare, 
   Filter, ChevronDown, ChevronUp, User, Phone, Mail, Calendar, 
   GraduationCap, Award, TrendingUp, TrendingDown, Check, X as XIcon, 
-  MoreVertical, ChevronLeft, ChevronRight 
+  MoreVertical, ChevronLeft, ChevronRight, CheckSquare, Square, SendHorizonal, AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Excel from 'exceljs';
@@ -61,6 +61,18 @@ const HeadTeacher = () => {
   const [teacher, setTeacher] = useState({});
   const [teachers,setTeachers] = useState([]);
 
+  // Bulk email states
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [isSelectAll, setIsSelectAll] = useState(false);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState('');
+  const [headTeacherSignature, setHeadTeacherSignature] = useState('');
+  const [sendingEmails, setSendingEmails] = useState(false);
+  const [emailStatus, setEmailStatus] = useState({ sent: 0, failed: 0, total: 0 });
+  const [emailProgress, setEmailProgress] = useState(0);
+  const [reportsStatus, setReportsStatus] = useState({});
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -89,7 +101,8 @@ const HeadTeacher = () => {
           teacherMapResponse, 
           studentScoreResponse, 
           schoolResponse, 
-          gradeResponse
+          gradeResponse,
+          reportsStatusResponse
         ] = await Promise.all([
           fetch('http://127.0.0.1:8000/classes/'),
           fetch('http://127.0.0.1:8000/subjects/'),
@@ -98,7 +111,8 @@ const HeadTeacher = () => {
           fetch(`http://127.0.0.1:8000/teachers/class_and_subjects?teacherId=${(teacherData?.data).teacherId}`),
           fetch('http://127.0.0.1:8000/students/score'),
           fetch(`http://127.0.0.1:8000/admin/schools/${(teacherData?.data)?.schoolId}`),
-          fetch('http://127.0.0.1:8000/grades/')
+          fetch('http://127.0.0.1:8000/grades/'),
+          fetch('http://127.0.0.1:8000/reports/status')
         ]);
 
         const classesData = await classesResponse.json();
@@ -109,13 +123,19 @@ const HeadTeacher = () => {
         const studentScoreData = await studentScoreResponse.json();
         const schoolData = await schoolResponse.json();
         const gradeData = await gradeResponse.json();
-    
-
+        const reportsStatusData = await reportsStatusResponse.json();
 
         setSchools(schoolData?.data || {});
         setGrades(gradeData?.data || []);
         setSubjects(subjectsData?.data || []);
         setStudentScore(studentScoreData?.data || []);
+
+        // Set reports status
+        const statusMap = {};
+        reportsStatusData?.data?.forEach(report => {
+          statusMap[report.studentId] = report.status;
+        });
+        setReportsStatus(statusMap);
 
         const filteredTeachers = (teachersData?.data || []).filter((teacherItem) => 
           teacherItem.schoolId === (teacherData?.data).schoolId 
@@ -211,7 +231,6 @@ const HeadTeacher = () => {
     const total =  scores.reduce((total, score) => total + score.score, 0);
     if(scores.length === 0) return 0
     return total/scores.length
-
   };
 
   const getSubjectScores = (studentId) => {
@@ -225,6 +244,198 @@ const HeadTeacher = () => {
         maxScore: 100
       };
     });
+  };
+
+  // Check if report is ready for sending
+  const isReportReadyForSending = (studentId) => {
+    const status = reportsStatus[studentId];
+    // Report is ready if it's "signed" or "sent_for_confirmation" by class teacher
+    return true;
+  };
+
+  // Select/Deselect individual student
+  const handleSelectStudent = (studentId) => {
+    const newSelected = new Set(selectedStudents);
+    
+    // Check if report is ready before allowing selection
+    if (!isReportReadyForSending(studentId)) {
+      setErrorMessage(`Report for this student is not ready for sending. It needs to be signed by class teacher first.`);
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    
+    if (newSelected.has(studentId)) {
+      newSelected.delete(studentId);
+    } else {
+      newSelected.add(studentId);
+    }
+    
+    setSelectedStudents(newSelected);
+    setShowBulkActions(newSelected.size > 0);
+    setIsSelectAll(newSelected.size === getFilteredStudentsForBulkAction(students).length);
+  };
+
+  // Select all students with ready reports
+  const handleSelectAll = () => {
+    if (isSelectAll) {
+      setSelectedStudents(new Set());
+      setIsSelectAll(false);
+      setShowBulkActions(false);
+    } else {
+      // Only select students with ready reports
+      const readyStudents = getFilteredStudentsForBulkAction(students).map(student => student.studentId);
+      
+      setSelectedStudents(new Set(readyStudents));
+      setIsSelectAll(readyStudents.length > 0);
+      setShowBulkActions(readyStudents.length > 0);
+    }
+  };
+
+  // Clear all selections
+  const handleClearSelection = () => {
+    setSelectedStudents(new Set());
+    setIsSelectAll(false);
+    setShowBulkActions(false);
+  };
+
+  // Filter function to show only students with ready reports
+  const getFilteredStudentsForBulkAction = (studentsList) => {
+    return studentsList.filter(student => 
+      isReportReadyForSending(student.studentId)
+    );
+  };
+
+  // Bulk send emails function
+  const handleBulkSendEmails = async () => {
+    if (selectedStudents.size === 0) {
+      setErrorMessage("No students selected");
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+
+    if (!headTeacherSignature.trim()) {
+      setErrorMessage("Please provide your signature before sending emails");
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+
+    setSendingEmails(true);
+    setEmailStatus({ sent: 0, failed: 0, total: selectedStudents.size });
+    setEmailProgress(0);
+
+    const studentArray = Array.from(selectedStudents);
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < studentArray.length; i++) {
+      const studentId = studentArray[i];
+      const student = students.find(s => s.studentId === studentId);
+      
+      if (!student) continue;
+
+
+      try {
+        
+
+        const emailData = {
+          studentId,
+          headTeacherSignature,
+          emailContent: emailTemplate || getDefaultEmailTemplate(student),
+          sentBy: teacher?.teacherId
+        };
+
+
+        console.log(emailData);
+
+        // Call API to send email
+        // const response = await fetch('http://127.0.0.1:8000/reports/send-email', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //   },
+        //   body: JSON.stringify(emailData),
+        // });
+
+        // if (response.ok) {
+        //   sentCount++;
+          
+        //   // Update report status to "sent_to_parent"
+        //   await fetch('http://127.0.0.1:8000/reports/update-status', {
+        //     method: 'PUT',
+        //     headers: {
+        //       'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({
+        //       studentId,
+        //       status: 'sent_to_parent',
+        //       updatedBy: teacher?.teacherId
+        //     }),
+        //   });
+        // } else {
+        //   failedCount++;
+        // }
+      } catch (error) {
+        console.error(`Error sending email for student ${studentId}:`, error);
+        failedCount++;
+      }
+
+      // Update progress
+      const progress = Math.round(((i + 1) / studentArray.length) * 100);
+      setEmailProgress(progress);
+      setEmailStatus({ sent: sentCount, failed: failedCount, total: studentArray.length });
+    }
+
+    setSendingEmails(false);
+    
+    if (sentCount > 0) {
+      setSuccessMessage(`Successfully sent ${sentCount} report(s) to parents`);
+    }
+    
+    if (failedCount > 0) {
+      setErrorMessage(`Failed to send ${failedCount} report(s). Please try again.`);
+    }
+
+    // Clear selections
+    handleClearSelection();
+    setShowEmailModal(false);
+    setHeadTeacherSignature('');
+    
+    setTimeout(() => {
+      setSuccessMessage('');
+      setErrorMessage('');
+    }, 5000);
+  };
+
+  // Default email template
+  const getDefaultEmailTemplate = (student) => {
+    const totalScore = getTotalScore(student.studentId);
+    const grade = calculatePerformance(totalScore);
+    const performance = getPerformanceStatus(totalScore);
+    
+    return `
+Dear Parent/Guardian,
+
+Please find the attached performance report for ${student.studentName}.
+
+Student Details:
+- Name: ${student.studentName}
+- Class: ${classes.find(c => c.classId === student.classId)?.className || 'N/A'}
+- Roll Number: ${student.rollId || 'N/A'}
+
+Performance Summary:
+- Total Score: ${totalScore.toFixed(2)}%
+- Grade: ${grade === 'N' ? 'NG' : grade}
+- Performance: ${performance}
+
+The detailed report includes subject-wise scores, teacher comments, and recommendations for improvement.
+
+Please feel free to contact the school if you have any questions or concerns.
+
+Best regards,
+${headTeacherSignature || teacher?.teacherName || 'Head Teacher'}
+Head Teacher
+${schools?.schoolName || 'School'}
+    `.trim();
   };
 
   // Filter and sort functions
@@ -303,8 +514,6 @@ const HeadTeacher = () => {
     return 0;
   });
 
-  console.log('sorted',sortedStudents)
-
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -350,7 +559,7 @@ const HeadTeacher = () => {
         { header: 'Performance', key: 'performance', width: 15 },
         { header: 'Address', key: 'address', width: 30 },
       ];
-  
+
       const rowsToAdd = data.map(row => ({
         rollNo: row.rollId || '',
         name: row.studentName || '',
@@ -393,7 +602,7 @@ const HeadTeacher = () => {
           showGridLines: true
         }
       ];
-  
+
       // Style data rows
       worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
         if (rowNumber > 1) {
@@ -498,7 +707,7 @@ const HeadTeacher = () => {
           }
         }
       });
-  
+
       // Auto fit columns
       worksheet.columns.forEach(column => {
         let maxLength = 0;
@@ -510,7 +719,7 @@ const HeadTeacher = () => {
         });
         column.width = maxLength < 10 ? 10 : maxLength + 2;
       });
-  
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `${fileName}.xlsx`);
@@ -784,7 +993,7 @@ const HeadTeacher = () => {
     const exportToExcel = async () => {
       const workbook = new Excel.Workbook();
       const worksheet = workbook.addWorksheet('Student Import Template');
-  
+
       // Define columns based on template
       const columns = STUDENT_TEMPLATE.columns.map(col => ({
         header: col,
@@ -793,7 +1002,7 @@ const HeadTeacher = () => {
       }));
       
       worksheet.columns = columns;
-  
+
       // Add sample data row
       const sampleRow = {
         'student_name': 'John Doe',
@@ -811,7 +1020,7 @@ const HeadTeacher = () => {
       };
       
       worksheet.addRow(sampleRow);
-  
+
       // Style header row
       worksheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 12 };
@@ -828,7 +1037,7 @@ const HeadTeacher = () => {
           right: { style: 'thin' }
         };
       });
-  
+
       // Style sample row
       worksheet.getRow(2).eachCell((cell) => {
         cell.font = { name: 'Arial', size: 11 };
@@ -845,7 +1054,7 @@ const HeadTeacher = () => {
           fgColor: { argb: 'F0F0F0' },
         };
       });
-  
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `student_import_template_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -1222,6 +1431,43 @@ const HeadTeacher = () => {
           </div>
         </div>
 
+        {/* Bulk Actions Toolbar */}
+        {showBulkActions && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl shadow-sm p-4 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-yellow-100 p-2 rounded-full">
+                  <SendHorizonal className="text-yellow-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-yellow-800">Bulk Actions ({selectedStudents.size} selected)</h3>
+                  <p className="text-sm text-yellow-600">
+                    Only reports signed by class teachers can be sent
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  disabled={sendingEmails}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send size={18} />
+                  Send to Parents
+                </button>
+                <button
+                  onClick={handleClearSelection}
+                  className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <X size={18} />
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Search and Filters Section */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4 mb-4">
@@ -1416,13 +1662,13 @@ const HeadTeacher = () => {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-gray-600 mb-1">Top Performers</div>
+                <div className="text-sm text-gray-600 mb-1">Ready Reports</div>
                 <div className="text-3xl font-bold text-emerald-600">
-                  {students.filter(s => getPerformanceStatus(s) === 'Excellent').length}
+                  {students.filter(s => isReportReadyForSending(s.studentId)).length}
                 </div>
               </div>
               <div className="bg-emerald-100 p-3 rounded-full">
-                <TrendingUp className="text-emerald-600" size={24} />
+                <FileText className="text-emerald-600" size={24} />
               </div>
             </div>
           </div>
@@ -1471,15 +1717,16 @@ const HeadTeacher = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    <button 
-                      onClick={() => handleSort('roll')}
-                      className="flex items-center gap-1 hover:text-indigo-600"
-                    >
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSelectAll}
+                        className="hover:text-indigo-600"
+                        title={isSelectAll ? "Deselect all" : "Select all ready reports"}
+                      >
+                        {isSelectAll ? <CheckSquare size={18} /> : <Square size={18} />}
+                      </button>
                       Roll No
-                      {sortConfig.key === 'roll' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                      )}
-                    </button>
+                    </div>
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     <button 
@@ -1527,11 +1774,31 @@ const HeadTeacher = () => {
                   const subjectScores = getSubjectScores(student.studentId);
                   
                   return (
-                    <tr key={student.studentId} className="hover:bg-gray-50 transition-colors">
-                      {/* Roll Number */}
+                    <tr key={student.studentId} className={`hover:bg-gray-50 transition-colors ${selectedStudents.has(student.studentId) ? 'bg-blue-50' : ''}`}>
+                      {/* Roll Number with Checkbox */}
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {student.rollId || 'N/A'}
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleSelectStudent(student.studentId)}
+                            disabled={!isReportReadyForSending(student.studentId)}
+                            className={`${!isReportReadyForSending(student.studentId) ? 'opacity-30 cursor-not-allowed' : 'hover:text-indigo-600'}`}
+                            title={!isReportReadyForSending(student.studentId) ? "Report not ready for sending" : "Select for bulk action"}
+                          >
+                            {selectedStudents.has(student.studentId) ? (
+                              <CheckSquare size={18} className="text-green-600" />
+                            ) : (
+                              <Square size={18} className="text-gray-400" />
+                            )}
+                          </button>
+                          <div className="text-sm font-medium text-gray-900">
+                            {student.rollId || 'N/A'}
+                            {!isReportReadyForSending(student.studentId) && (
+                              <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                                <AlertCircle size={12} />
+                                Awaiting class teacher
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       
@@ -1799,6 +2066,193 @@ const HeadTeacher = () => {
         </div>
       )}
 
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="bg-green-600 text-white p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Send Reports to Parents</h2>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="text-white hover:text-gray-200 text-2xl"
+                disabled={sendingEmails}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="space-y-6">
+                {/* Selection Summary */}
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-blue-800">Reports to Send</h3>
+                      <p className="text-sm text-blue-700">
+                        {selectedStudents.size} student report(s) selected
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-blue-700">
+                        Students: {selectedStudents.size}
+                      </div>
+                      <button
+                        onClick={handleClearSelection}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                        disabled={sendingEmails}
+                      >
+                        Change selection
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Signature Verification */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Head Teacher Signature *
+                    <span className="text-xs text-gray-500 ml-2">
+                      Required for sending reports
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={headTeacherSignature}
+                    onChange={(e) => setHeadTeacherSignature(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter your full name as signature"
+                    disabled={sendingEmails}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This will be included as your approval on all reports
+                  </p>
+                </div>
+
+                {/* Email Template */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Template
+                    <span className="text-xs text-gray-500 ml-2">
+                      Customize the message sent to parents
+                    </span>
+                  </label>
+                  <textarea
+                    value={emailTemplate || getDefaultEmailTemplate(students.find(s => s.studentId === Array.from(selectedStudents)[0]) || {})}
+                    onChange={(e) => setEmailTemplate(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 h-48 resize-none"
+                    placeholder="Enter email content..."
+                    disabled={sendingEmails}
+                  />
+                  <div className="flex justify-between mt-2">
+                    <button
+                      onClick={() => setEmailTemplate('')}
+                      className="text-sm text-gray-600 hover:text-gray-800"
+                      disabled={sendingEmails}
+                    >
+                      Reset to default
+                    </button>
+                    <div className="text-sm text-gray-500">
+                      {emailTemplate.length} characters
+                    </div>
+                  </div>
+                </div>
+
+                {/* Class Filter for Bulk Send */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-800 mb-3">Filter by Class</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        // Select all ready reports from current class filter
+                        const classFiltered = filteredStudents.filter(student => 
+                          isReportReadyForSending(student.studentId)
+                        );
+                        setSelectedStudents(new Set(classFiltered.map(s => s.studentId)));
+                      }}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
+                      disabled={sendingEmails}
+                    >
+                      Select all in filtered view ({filteredStudents.filter(s => isReportReadyForSending(s.studentId)).length})
+                    </button>
+                    
+                    {classes.map(cls => (
+                      <button
+                        key={cls.classId}
+                        onClick={() => {
+                          // Select all ready reports from specific class
+                          const classStudents = students.filter(student => 
+                            student.classId === cls.classId && 
+                            isReportReadyForSending(student.studentId)
+                          );
+                          setSelectedStudents(new Set(classStudents.map(s => s.studentId)));
+                        }}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                        disabled={sendingEmails}
+                      >
+                        {cls.className} ({students.filter(s => s.classId === cls.classId && isReportReadyForSending(s.studentId)).length})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sending Progress */}
+                {sendingEmails && (
+                  <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-green-800">Sending emails...</span>
+                      <span className="text-green-700">{emailProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${emailProgress}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between mt-2 text-sm text-green-700">
+                      <span>Sent: {emailStatus.sent}</span>
+                      <span>Failed: {emailStatus.failed}</span>
+                      <span>Total: {emailStatus.total}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t">
+                  <button
+                    onClick={handleBulkSendEmails}
+                    disabled={sendingEmails || !headTeacherSignature.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {sendingEmails ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={20} />
+                        Send {selectedStudents.size} Report(s)
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEmailModal(false);
+                      setHeadTeacherSignature('');
+                      setEmailTemplate('');
+                    }}
+                    disabled={sendingEmails}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg transition-colors disabled:opacity-50 font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pagination Footer */}
       {sortedStudents.length > 0 && (
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
@@ -2010,37 +2464,6 @@ const HeadTeacher = () => {
                     </select>
                   </div>
                   
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parent Email
-                    </label>
-                    <input
-                      type="email"
-                      value={studentForm.email}
-                      onChange={(e) => setStudentForm({...studentForm, email: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g., student@gmail.com"
-                    />
-                  </div> */}
-                  
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Class
-                    </label>
-                    <select
-                      value={studentForm.classId}
-                      onChange={(e) => setStudentForm({...studentForm, classId: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="" disabled>Select a class</option>
-                      {classes.map((classItem) => (
-                        <option key={classItem.classId} value={classItem.classId}>
-                          {classItem.className}
-                        </option>
-                      ))}
-                    </select>
-                  </div> */}
-                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Inactive Details
@@ -2056,32 +2479,6 @@ const HeadTeacher = () => {
               ) : (
                 /* Teacher Form */
                 <div className="space-y-4">
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Teacher Name
-                    </label>
-                    <input
-                      type="text"
-                      value={teacherForm.teacherName}
-                      onChange={(e) => setTeacherForm({...teacherForm, teacherName: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="Enter teacher name"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={teacherForm.email}
-                      onChange={(e) => setTeacherForm({...teacherForm, email: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g., teacher@gmail.com"
-                    />
-                  </div> */}
-
                   {/* implement type search */}
                   <div ref={wrapperRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2149,42 +2546,6 @@ const HeadTeacher = () => {
                     )}
                   </div>
                   
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Subject
-                    </label>
-                    <select
-                      value={teacherForm.subject}
-                      onChange={(e) => setTeacherForm({...teacherForm, subject: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="" disabled>Select a subject</option>
-                      {subjects.map((subject) => (
-                        <option key={subject.subjectId} value={subject.subjectId}>
-                          {subject.subjectName}
-                        </option>
-                      ))}
-                    </select>
-                  </div> */}
-                  
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Class
-                    </label>
-                    <select
-                      value={teacherForm.classId}
-                      onChange={(e) => setTeacherForm({...teacherForm, classId: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="" disabled>Select a class</option>
-                      {classes.map((classItem) => (
-                        <option key={classItem.classId} value={classItem.classId}>
-                          {classItem.className}
-                        </option>
-                      ))}
-                    </select>
-                  </div> */}
-
                   {/* offBoarding date if user want to offboard */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

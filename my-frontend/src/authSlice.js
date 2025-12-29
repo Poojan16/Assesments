@@ -1,34 +1,3 @@
-    // // features/auth/authSlice.js
-    // import { createSlice } from '@reduxjs/toolkit';
-
-    // const initialState = {
-    //     isAuthenticated: false,
-    //     user: null, // { id, username, role, permissions: [] }
-    //     token: null,
-    // };
-
-    // const authSlice = createSlice({
-    //     name: 'auth',
-    //     initialState,
-    //     reducers: {
-    //         loginSuccess: (state, action) => {
-    //             state.isAuthenticated = true;
-    //             state.user = action.payload;
-    //         },
-    //         logout: (state) => {
-    //             state.isAuthenticated = false;
-    //             state.user = null;
-    //             state.token = null;
-    //         },
-    //         // You might also have a reducer to update user permissions if they change during a session
-    //     },
-    // });
-
-    // export const { loginSuccess, logout } = authSlice.actions;
-    // export default authSlice;
-
-
-// authSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
 // Load initial state from localStorage

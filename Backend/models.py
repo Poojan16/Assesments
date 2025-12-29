@@ -1,7 +1,7 @@
 # models.py
 from sqlalchemy import (
     Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP,
-    Enum, Text
+    Enum, Text, Enum as SQLEnum, JSON
 )
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 import enum
@@ -21,6 +21,11 @@ class RoleEnum(str, enum.Enum):
     Head_Teacher = "HT",
     Subject_Teacher = "ST",
 
+class EmailStatus(str, enum.Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    RETRYING = "retrying"
 
 # ROLES
 class Role(Base):
@@ -309,7 +314,34 @@ class Fees(Base):
     studentId = Column(Integer, ForeignKey("students.studentId"), nullable=False)
     amount = Column(Integer, nullable=False)
     isPaid = Column(Boolean, default=False)
+    classId = Column(Integer, ForeignKey("classes.classId"), nullable=False)
     iModifyBy = Column(Integer, ForeignKey("teachers.teacherId"), nullable=True)
     iStatus = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, default=datetime.now())
     DModify = Column(TIMESTAMP, default=datetime.now())
+    
+class EmailLog(Base):
+    __tablename__ = "email_logs"
+
+    email_id = Column(Integer, primary_key=True)
+    to = Column(String(255), nullable=False)
+    subject = Column(String(255), nullable=False)
+    body = Column(String(255), nullable=False)
+    attachment = Column(String(255), nullable=True, default=None)
+    status = Column(SQLEnum(EmailStatus), default=EmailStatus.PENDING)
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    retry_interval = Column(Integer, default=300)  # 5 minutes in seconds
+    last_attempt = Column(TIMESTAMP, nullable=True)
+    error_details = Column(String(500), nullable=True)
+    modify_by = Column(Integer, ForeignKey("teachers.teacherId"), nullable=True)
+    created_at = Column(TIMESTAMP, default=datetime.now)
+    modified_at = Column(TIMESTAMP, default=datetime.now, onupdate=datetime.now)
+    metadatas = Column(JSON, nullable=True)  # For additional tracking info
+    
+    @property
+    def can_retry(self):
+        return (
+            self.status in [EmailStatus.FAILED, EmailStatus.PENDING] and 
+            self.retry_count < self.max_retries
+        )

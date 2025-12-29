@@ -4,12 +4,14 @@ import jwt
 import os
 from jose import JWTError
 from fastapi import HTTPException, status
+from redis_client import mark_token_used, get_reset_token, save_reset_token
+import logging
 
 # Your JWT settings
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 
-def create_expiring_link_token(email: str, expires_delta: timedelta) -> str:
+async def create_expiring_link_token(email: str, expires_delta: timedelta) -> str:
     """
     Create a JWT token that includes the email in the payload
     """
@@ -20,36 +22,52 @@ def create_expiring_link_token(email: str, expires_delta: timedelta) -> str:
         "type": "reset_password"  # Optional: Add token type for better validation
     }
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    try:
+        await save_reset_token(encoded_jwt, email, expire)
+    except Exception as e:
+        logging.error(f"Error saving reset token: {e}")
     return encoded_jwt
 
-def decode_expiring_link_token(token: str) -> dict:
-    """
-    Decode the JWT token and return the payload containing email
-    """
+async def decode_expiring_link_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
         email: str = payload.get("sub")
         token_type: str = payload.get("type")
-        
-        if email is None:
+
+        if not email or not token_type:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: No email found",
+                detail="Invalid token",
             )
-        # token used to reset password
-        
-        # Optional: Check token type if you have different token types
+
         if token_type != "reset_password":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token type",
             )
-            
+
+        # 🔍 Check Redis using jti (NOT token)
+        token_data = await get_reset_token(token)
+
+        if not token_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired link",
+            )
+
+        if token_data.get("is_used") == "true":
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="This link has already been used",
+            )
+
         return {
             "email": email,
             "type": token_type,
             "exp": payload.get("exp")
         }
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,7 +78,7 @@ def decode_expiring_link_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         )
-    
+
     
 
 

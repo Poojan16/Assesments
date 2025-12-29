@@ -14,7 +14,7 @@ router = APIRouter(
     tags=["Users"],
 )
 
-@router.get("/", response_model=UserResponse)
+@router.get("/")
 async def getAll():
     try:
         allUsers = await users.getAll()
@@ -22,7 +22,7 @@ async def getAll():
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
 
-@router.get("/id", response_model=UserResponse)
+@router.get("/id")
 async def get_user(user_id: int):
     try:
         user = await users.get_user(user_id)
@@ -30,7 +30,7 @@ async def get_user(user_id: int):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
 
-@router.post("/", response_model=UserResponse)
+@router.post("/")
 async def create_user(user: UserBase):
     # json parse data
     try:
@@ -39,7 +39,7 @@ async def create_user(user: UserBase):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
     
-@router.put("/reset", response_model=UserResponse)
+@router.put("/reset")
 async def reset(email: str = Form(...), password: str = Form(...)):
     try:
         user_info = await users.reset(email, password)
@@ -47,7 +47,7 @@ async def reset(email: str = Form(...), password: str = Form(...)):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
 
-@router.get("/otp", response_model=UserResponse)
+@router.get("/otp")
 async def send_otp(email:str):
     try:
         otp = await users.send_otp(email)
@@ -55,7 +55,7 @@ async def send_otp(email:str):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
     
-@router.get("/resetPassword", response_model=UserResponse)
+@router.get("/resetPassword")
 async def resetPassword(token:str):
     try:
         otp = await users.resetPassword(token)
@@ -64,7 +64,7 @@ async def resetPassword(token:str):
         raise httpException(status_code=400, detail=str(e))
     
 # admin will pass minutes for rest password link expiry and set it to the function
-@router.post("/expiry", response_model=UserResponse)
+@router.post("/expiry")
 async def expiry_link(time: int):
     try:
         link = await users.expiry_link(time)
@@ -72,7 +72,7 @@ async def expiry_link(time: int):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
 
-@router.get("/link", response_model=UserResponse)
+@router.get("/link")
 async def link_check(email:str):
     try:
         link = await users.link_check(email)
@@ -80,7 +80,7 @@ async def link_check(email:str):
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
 
-@router.get("/decodelink", response_model=UserResponse)
+@router.get("/decodelink")
 async def decodelink(link):
     try:
         decode = await users.decodelink(link)

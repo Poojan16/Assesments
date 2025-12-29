@@ -48,49 +48,6 @@ async def upload_and_encrypt_file(file: UploadFile = File(...), folder_name: str
         print(e)
         return f"File processing error: {e}"
 
-# async def decrypt_file(filepath: str):
-#     """
-#     Decrypts and returns the content of an encrypted file.
-#     """
-#     # file path like this filepath = "/{folder_name}/encrypted.txt"
-#     UPLOAD_FOLDER = os.path.join(os.path.dirname(filepath))
-#     print(UPLOAD_FOLDER)
-#     filename = os.path.basename(filepath)
-#     print(filename)
-#     file_path = os.path.join(UPLOAD_FOLDER, filename)
-#     print(file_path)
-#     if not os.path.exists(file_path):
-#         raise HTTPException(status_code=404, detail="File not found")
-#     try:
-#         with open(file_path, "rb") as f:
-#             encrypted_content = f.read()
-        
-#         decrypted_content = cipher_suite.decrypt(encrypted_content)
-
-#         file_extension = os.path.splitext(filename)[1].lower()
-#         print(file_extension)
-#         media_type = "application/octet-stream"  # Default for binary data
-#         if file_extension == ".txt":
-#             media_type = "text/plain"
-#         elif file_extension == ".jpg" or file_extension == ".jpeg":
-#             media_type = "image/jpeg"
-#         elif file_extension == ".png":
-#             media_type = "image/png"
-#         elif file_extension == ".pdf":
-#             media_type = "application/pdf"
-            
-#         print(media_type)
-#         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-#             decrypted_stream = io.BytesIO(decrypted_content)
-#             async for chunk in decrypted_stream:
-#                 temp_file.write(chunk)
-#             temp_file.flush()
-#             return StreamingResponse(temp_file.name, media_type=media_type)
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Decryption error: {e}")
-
-
 async def decrypt_file(filepath: str) -> bytes:
     """
     Decrypts and returns the raw bytes of an encrypted file.

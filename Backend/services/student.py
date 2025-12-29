@@ -389,44 +389,40 @@ async def get_student_scores(studentId: int):
         db.close()
 
 async def create_student_score(studentId: int = Form(...), subjectId: int = Form(...), score: int = Form(...)):
+    db = SessionLocal()
     try:
-        db = SessionLocal()
-        student  = db.query(StudentScore).filter(StudentScore.studentId == studentId, StudentScore.subjectId == subjectId).first()
-        if(not student):
-            try:
-                grade = db.query(Grade).filter(score <= Grade.upperLimit, score >= Grade.lowerLimit ).first()
-                studentScore = StudentScore(studentId=studentId, subjectId=subjectId, score=score, grade=grade.gradeId)
-                db.add(studentScore)
-                db.commit()
-                db.refresh(studentScore)
-                return {
-                    "status_code": 200,
-                    "success": True,
-                    "data": studentScore,
-                    "message": "Score created successfully",
-                }
-            except Exception as e:
-                db.rollback()
-                raise HTTPException(status_code=500, detail=str(e))
-        elif(student):
-            try:
-                grade = db.query(Grade).filter(score <= Grade.upperLimit, score >= Grade.lowerLimit ).first()
-                student.score = score
-                student.grade = grade.gradeId
-                db.commit()
-                db.refresh(student)
-                return {
-                    "status_code": 200,
-                    "success": True,
-                    "data": student,
-                    "message": "Score updated successfully",
-                }
-            except Exception as e:
-                db.rollback()
-                raise HTTPException(status_code=500, detail=str(e))
+        grade = db.query(Grade).filter(score <= Grade.upperLimit, score >= Grade.lowerLimit ).first()
+        studentScore = StudentScore(studentId=studentId, subjectId=subjectId, score=score, grade=grade.gradeId)
+        db.add(studentScore)
+        db.commit()
+        db.refresh(studentScore)
+        return {
+            "status_code": 200,
+            "success": True,
+            "data": studentScore,
+            "message": "Score created successfully",
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
+async def update_student_score(id:int, score: int = Form(...)):
+    db = SessionLocal()
+    student = db.query(StudentScore).filter(StudentScore.studentScoreId == id).first()
+    try:
+        grade = db.query(Grade).filter(score <= Grade.upperLimit, score >= Grade.lowerLimit ).first()
+        student.score = score
+        student.grade = grade.gradeId
+        db.commit()
+        db.refresh(student)
+        return {
+            "status_code": 200,
+            "success": True,
+            "data": student,
+            "message": "Score updated successfully",
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

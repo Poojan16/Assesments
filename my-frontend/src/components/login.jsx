@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Watch } from 'react-hook-form';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { loginSuccess } from '../authSlice';
 import Loader from './loader';
 import CarRotationActivity from './botValidation';
 import { object } from 'yup';
-
+import {loadState}  from '../authSlice';
 
 
 const LoginPage = () => {
@@ -28,6 +28,9 @@ const LoginPage = () => {
     } = useForm();
 
     const email = watch('email');
+
+    const auths = localStorage.getItem('authState');
+    console.log(auths)
 
   const onSubmit = async (data) => {
   
@@ -58,6 +61,8 @@ const LoginPage = () => {
         
           const userRole = data?.data || {};
           console.log(userRole);
+
+          
 
           dispatch(loginSuccess(userRole));
 

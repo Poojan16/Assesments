@@ -169,3 +169,11 @@ async def create_student_score(studentId: int = Form(...), subjectId: int = Form
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/score/{id}")
+async def update_student_score(id: int, score: int = Form(...)):
+    try:
+        updateScore = await student.update_student_score(id,score)
+        return updateScore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

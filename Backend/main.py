@@ -15,39 +15,70 @@ from database import SessionLocal
 from models import *
 from datetime import *
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Union
 from uploadFile import decrypt_file, upload_and_encrypt_file
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from routers.paymentConfig import schedule_annual_notifications
 import random
-
-
+from redis_client import redis_client,get_reset_token
+import logging
+from services.paymentConfig import *
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handles application startup and shutdown events."""
-    scheduler = AsyncIOScheduler()
-    # In a real app, fetch recipients from your database
-    db = SessionLocal()
-    fees = db.query(Fees).filter(Fees.isPaid == False).all()  
-    student_ids = []
+    """Handle application startup and shutdown"""
     
-    try:
-        for fee in fees:
-            student_info = db.query(Student).filter(Student.studentId == fee.studentId and Student.active != False).first()
-            if student_info:
-                student_ids.append(student_info.studentId)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-                
-    recipients = student_ids
+    # Startup
+    logger.info("Starting up application...")
     
-    # Schedule initial set of annual notifications on startup
-    # schedule_annual_notifications(scheduler, datetime.today().date(), recipients, db)
+    # Initialize email sender
+    await email_sender.initialize()
+    
+    # Initialize scheduler in background
+    async def init_scheduler():
+        global notification_scheduler
+        db = SessionLocal()
+        try:
+            notification_scheduler = NotificationScheduler(email_sender, db)
+            notification_scheduler.start()
+            
+            # Schedule annual notifications
+            await schedule_annual_notifications(notification_scheduler.scheduler)
+            
+        finally:
+            db.close()
+    
+    asyncio.create_task(init_scheduler())
+    
+    yield  # App runs here
+    
+    # Shutdown
+    logger.info("Shutting down application...")
+    
+    if notification_scheduler:
+        notification_scheduler.stop()
+    
+    await email_sender.shutdown()
+    
+    logger.info("Application shutdown complete")    
 
-    scheduler.start()
-    yield
-    scheduler.shutdown()
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     """Handles application startup and shutdown events."""
+    
+#     try:
+#         await redis_client.ping()
+#         print("✅ Redis connected")
+#     except Exception as e:
+#         print("❌ Redis connection failed:", e)
+
+#     yield  # App runs here
+
+#     # Shutdown
+#     await redis_client.close()
+#     print("🔻 Redis connection closed")
 
 # FastAPI app    
 app = FastAPI(
@@ -56,6 +87,15 @@ app = FastAPI(
     description="This is the main API for managing all the student grading system.",
     version="1.0.0",
 )
+
+@app.on_event("startup")
+async def startup():
+    await redis_client.ping()
+    print("✅ Redis connected")
+
+@app.on_event("shutdown")
+async def shutdown():
+    await redis_client.close()
 
 origins = [
     "http://localhost:3000",  # Example for a React frontend on port 3000
@@ -85,6 +125,15 @@ app.include_router(paymentConfig.router)
 # Include the router from roles.py
 # You can add a prefix and tags here, which will apply to all routes in the roles router
 
+@app.get("/testing")
+async def testing(student_id: int ):
+    db = SessionLocal
+    sender =  EnhancedBatchEmailSender(redis_manager=redis_manager)
+    return await sender.prepare_student_email_data(student_id,db)
+
+@app.get("/tokens")
+async def get_reset_token():
+    return get_reset_token()
 @app.get("/")
 def read_root():
     conn = get_db()
@@ -94,23 +143,6 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "scheduler_running": app.state.scheduler.running}
-
-# decrypt function check
-# @app.post("/encrypt")
-# async def decrypt_data(data: UploadFile = File(...)):
-#     try:
-#         encryped_data = await upload_and_encrypt_file(data)
-#         return encryped_data
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-    
-# @app.post("/decrypt")
-# async def decrypt_data(data: UploadFile = File(...)):
-#     try:
-#         decrypted_data = await decrypt_file(data.filename)
-#         return decrypted_data
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/send-email/")
@@ -161,7 +193,8 @@ async def add_fees():
             fees = Fees(
                 studentId=student.studentId,
                 amount= 10000 + (1000*student.classId),
-                isPaid=False
+                isPaid=False,
+                classId=student.classId
             )
             db.add(fees)
         db.commit()
@@ -221,7 +254,8 @@ async def transfer_student_next_class(classId: int, schoolId: int, studentId: Op
                 fees = Fees(
                     studentId=student.studentId,
                     amount= 10000 + (1000*student.classId),
-                    isPaid=False
+                    isPaid=False,
+                    classId=student.classId
                 )
                 db.add(fees)
                 db.commit()
@@ -241,7 +275,8 @@ async def transfer_student_next_class(classId: int, schoolId: int, studentId: Op
                 fees = Fees(
                     studentId=student.studentId,
                     amount= 10000 + (1000*student.classId),
-                    isPaid=False
+                    isPaid=False,
+                    classId=student.classId
                 )
                 db.add(fees)
         db.commit()
@@ -249,8 +284,32 @@ async def transfer_student_next_class(classId: int, schoolId: int, studentId: Op
         return {"message": "Students transferred to next class successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+  
+@app.post("/send-central-email")
+async def Central_email_testing(
+    email: EmailStr = 'pujansoni.jcasp@gmail.com',
+    subject: str = "Email Subject",
+    body: str = "Email Body",
+    attachment: Optional[UploadFile] = File(None),
+    metadatas: Any = None,
+    max_retries: int = 3,
+    retry_interval: int = 300
+):
+    email_data = EmailRequest(
+        emails=[email],
+        subject=subject,
+        body=body,
+        attachment=attachment,  # UploadFile or None
+        metadatas=metadatas,
+        max_retries=max_retries,
+        retry_interval=retry_interval
+    )
 
+    try:
+        response = await send_email_with_retry(email_data)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/add-bulk-student-score")  
 async def add_bulk_student_score():

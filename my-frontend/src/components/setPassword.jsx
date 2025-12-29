@@ -226,7 +226,7 @@ const NewPasswordForm = () => {
           setTokenData(data);
           setIsTokenValid(true);
         } else {
-          setServerError(data.detail || "Token is invalid or has expired");
+          setServerError(data.detail || "Token is invalid or has expired or has already been used.");
         }
       } catch (error) {
         console.error("Token validation error:", error);

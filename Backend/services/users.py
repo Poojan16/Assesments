@@ -284,6 +284,12 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
             print(jsonable_encoder(user_info))
 
             if different_device:
+                db.query(Login).filter(Login.email == user_data.email).update({
+                    "ip": client_ip,
+                    "device": current_device_type,
+                    "os": current_os,
+                    "browser": current_browser
+                })
                 await post_user_audit(user_info.userId, "user logged in with a different device")
                 return {
                     "statusCode": 200,

@@ -158,7 +158,9 @@ class EmailNotificationSystem:
             logging.info("Notification sent successfully")
             
         except Exception as e:
-            logging.error(f"Failed to send notification: {str(e)}")
+            if("550, '5.4.5 Daily user sending limit exceeded" in str(e)):
+                logging.warning("Daily SMTP rate limit exceeded, waiting for reset")
+                await asyncio.sleep(30)
 
 class CentralEmailService:
     def __init__(self, db_session_factory, notification_system: EmailNotificationSystem):
@@ -213,7 +215,7 @@ class CentralEmailService:
             "too many requests",
             "quota exceeded",
             "421 4.7.0", 
-            "550 5.7.0",  
+            "550, '5.4.5 Daily user sending limit exceeded",  
         ]
         
         is_rate_limit = any(indicator in error_msg for indicator in rate_limit_indicators)
@@ -231,6 +233,9 @@ class CentralEmailService:
             
             if email_log:
                 await self._schedule_retry_with_backoff(email_log, backoff_delay)
+            
+            if not error_msg.startswith("550, '5.4.5 Daily user sending limit exceeded"):
+                await self.notification_system.send_email_notification(email_log, success=False)
             
             return backoff_delay
         
@@ -335,6 +340,9 @@ class CentralEmailService:
                         message.attachments = [(email_schema.attachment, None)]
                     
                     await self.fm.send_message(message)
+                    email_log.status = EmailStatus.SENT
+                    email_log.modified_at = datetime.now()
+                    db.commit()
                     self.rate_limit_tracker.record_request()
                     
             except Exception as e:
@@ -416,8 +424,7 @@ class CentralEmailService:
         """Retry sending a specific failed email"""
         logging.info(f"Retrying email {email_id}")
         email_log = self.db_session_factory.query(EmailLog).filter(EmailLog.email_id == email_id).first()
-        logging.info(f"Retrying email {email_log}")
-        
+                
         if not email_log or not email_log.can_retry:
             return
         
@@ -429,10 +436,7 @@ class CentralEmailService:
                 attachment=email_log.attachment,
                 metadatas={'email_id': email_id}
             )
-            logging.info(f"sending email {email_schema}")
-            await self._send_message_with_retry_and_rate_limit(email_schema, {'email_id': email_id})
-            logging.info(f"Email {email_id} sent successfully")
-            
+            await self._send_message_with_retry_and_rate_limit(email_schema, {'email_id': email_id})            
         except Exception as e:
             logging.error(f"Failed to retry email {email_id}: {str(e)}")
         
@@ -440,7 +444,7 @@ class CentralEmailService:
     async def process_pending_emails_in_batches(self, batch_size: Optional[int] = None):
         """Process all pending/failed emails in configurable batches"""
         pending_emails = self.db_session_factory.query(EmailLog).filter(
-            EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.FAILED]),
+            EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.FAILED, EmailStatus.RETRYING]),
             EmailLog.retry_count < EmailLog.max_retries
         ).all()
         

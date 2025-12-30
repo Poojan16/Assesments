@@ -3077,7 +3077,7 @@ const ClassTeacherDashboard = () => {
 
   const handlePdfGenerated = (pdfInfo) => {
     console.log("PDF generated successfully:", pdfInfo);
-    setPdfData(pdfInfo);
+    // setPdfData(pdfInfo);
     setGeneratePdf(false);
   };
 

@@ -348,32 +348,13 @@ const HeadTeacher = () => {
         console.log(emailData);
 
         // Call API to send email
-        // const response = await fetch('http://127.0.0.1:8000/reports/send-email', {
-        //   method: 'POST',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        //   body: JSON.stringify(emailData),
-        // });
-
-        // if (response.ok) {
-        //   sentCount++;
-          
-        //   // Update report status to "sent_to_parent"
-        //   await fetch('http://127.0.0.1:8000/reports/update-status', {
-        //     method: 'PUT',
-        //     headers: {
-        //       'Content-Type': 'application/json',
-        //     },
-        //     body: JSON.stringify({
-        //       studentId,
-        //       status: 'sent_to_parent',
-        //       updatedBy: teacher?.teacherId
-        //     }),
-        //   });
-        // } else {
-        //   failedCount++;
-        // }
+        const response = await fetch('http://127.0.0.1:8000/reports/send-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailData),
+        });
       } catch (error) {
         console.error(`Error sending email for student ${studentId}:`, error);
         failedCount++;
@@ -1155,6 +1136,7 @@ ${schools?.schoolName || 'School'}
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [teacherSearch, setTeacherSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   const wrapperRef = useRef(null);
 
   // Debounced API search
@@ -1194,10 +1176,16 @@ ${schools?.schoolName || 'School'}
     };
   }, []);
 
-  const handleSelect = (teacher) => {
-    setTeacherSearch(teacher.teacherName);
-    teacherForm.teacherId = String(teacher.teacherId);
-    setShowDropdown(false);
+  const handleSelect = (user) => {
+    if(user?.studentId){
+      setStudentSearch(user.studentName);
+      studentForm.studentId = String(user.studentId);
+      setShowDropdown(false);
+    }else{
+      setTeacherSearch(user.teacherName);
+      teacherForm.teacherId = String(user.teacherId);
+      setShowDropdown(false);
+    }
   };
 
   const handleProvisionSubmit = async () => {
@@ -2446,7 +2434,7 @@ ${schools?.schoolName || 'School'}
               {isStudent ? (
                 <div className="space-y-4">
                   {/* select student */}
-                  <div>
+                  {/* <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Student Name
                     </label>
@@ -2462,6 +2450,66 @@ ${schools?.schoolName || 'School'}
                         </option>
                       ))}
                     </select>
+                  </div> */}
+
+                  <div ref={wrapperRef} className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Student Name
+                    </label>
+                    
+                    <div className="relative">
+                      <input
+                        type="text"
+                        onChange={(e) => handleSearch(e.target.value)}
+                        onFocus={() => studentSearch.trim() !== '' && setShowDropdown(true)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="Start typing to search..."
+                      />
+                      
+                      {/* Loading indicator */}
+                      {isLoading && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dropdown Results */}
+                    {showDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl">
+                        {isLoading ? (
+                          <div className="p-4 text-center">
+                            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                            <p className="text-sm text-gray-500 mt-2">Searching...</p>
+                          </div>
+                        ) : students.length > 0 ? (
+                          <div className="max-h-60 overflow-y-auto">
+                            {students.map((student) => (
+                              <div
+                                key={student.studentId}
+                                onClick={() => handleSelect(student)}
+                                className="p-3 hover:bg-indigo-50 cursor-pointer border-b last:border-b-0 group"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-medium text-gray-900 group-hover:text-indigo-700">
+                                      {student.studentName}, class-{student.classId} ({student.rollId})
+                                    </p>
+                                  </div>
+                                  <svg className="w-5 h-5 text-gray-400 group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : studentSearch.trim() !== '' ? (
+                          <div className="p-4 text-center text-gray-500">
+                            No students found for "{studentSearch}"
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                   
                   <div>
@@ -2488,7 +2536,6 @@ ${schools?.schoolName || 'School'}
                     <div className="relative">
                       <input
                         type="text"
-                        value={teacherSearch}
                         onChange={(e) => handleSearch(e.target.value)}
                         onFocus={() => teacherSearch.trim() !== '' && setShowDropdown(true)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"

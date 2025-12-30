@@ -33,17 +33,17 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     # scheduler.add_job(
     #     schedule_annual_notifications,
-    #     IntervalTrigger(minutes=10),  
+    #     IntervalTrigger(minutes=1),  
     #     id="hourly_notification_check",
     #     replace_existing=True
     # )
     central_email_service = CentralEmailService(SessionLocal(), EmailNotificationSystem(SessionLocal()))
-    scheduler.add_job(
-        central_email_service.central_email_system,
-        IntervalTrigger(minutes=1),  
-        id="hourly_email_check",
-        replace_existing=True
-    )
+    # scheduler.add_job(
+    #     central_email_service.central_email_system,
+    #     IntervalTrigger(minutes=1),  
+    #     id="hourly_email_check",
+    #     replace_existing=True
+    # )
     scheduler.start()
     yield
     scheduler.shutdown()

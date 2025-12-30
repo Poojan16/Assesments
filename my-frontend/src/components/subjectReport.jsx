@@ -8,6 +8,9 @@ const BatchStudentReportCard = ({
   studentsData, // Array of student objects
   onBatchComplete 
 }) => {
+  console.log(studentsData);
+  console.log(schoolDetail);
+  
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [processingStatus, setProcessingStatus] = useState({
     total: 0,

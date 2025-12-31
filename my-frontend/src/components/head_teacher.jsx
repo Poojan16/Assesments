@@ -14,6 +14,7 @@ import Loader from './loader';
 import { useDispatch, useSelector } from 'react-redux';
 import * as XLSX from 'xlsx';
 import { initializeAuth, logout } from '../authSlice';
+import BatchStudentReportCard from './subjectReport';
 
 const HeadTeacher = () => {
   const { user } = useSelector((state) => state.auth);
@@ -63,6 +64,7 @@ const HeadTeacher = () => {
 
   // Bulk email states
   const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [subjectScores, setSubjectScores] = useState([]);
   const [isSelectAll, setIsSelectAll] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -130,6 +132,21 @@ const HeadTeacher = () => {
         setSubjects(subjectsData?.data || []);
         setStudentScore(studentScoreData?.data || []);
 
+        const filteredStudentsScore = (studentData?.data || []). map((student) => {
+          const subjectScore = subjectsData?.data?.map((subject) => {
+            const studentScore = studentScoreData?.data?.find((score) => score.studentId === student.studentId && score.subjectId === subject.subjectId);
+            return {
+              subjectName: subject.subjectName,
+              score: studentScore?.score || 0,
+              maxScore: 100,
+              grade: (gradeData?.data).find((grade) => grade.gradeId === studentScore?.grade)?.gradeLetter
+            }
+          })
+          return { ...student, subjectScores: subjectScore || 0 };
+        })
+
+        setSubjectScores(filteredStudentsScore);
+
         // Set reports status
         const statusMap = {};
         reportsStatusData?.data?.forEach(report => {
@@ -174,6 +191,9 @@ const HeadTeacher = () => {
 
     fetchData();
   }, [user]);
+
+  console.log(subjectScores);
+  console.log(selectedStudents);
 
   const getPerformance = (gradeLetter) => {
     switch (gradeLetter) {
@@ -248,7 +268,7 @@ const HeadTeacher = () => {
 
   // Check if report is ready for sending
   const isReportReadyForSending = (studentId) => {
-    const status = reportsStatus[studentId];
+    // const status = reportsStatus[studentId];
     // Report is ready if it's "signed" or "sent_for_confirmation" by class teacher
     return true;
   };
@@ -335,25 +355,19 @@ const HeadTeacher = () => {
 
 
       try {
-        
+        // [{studentId: 112, studentName: 'Aarav Kumar', blob: Blob, url: 'blob:http://localhost:3000/004eec84-c1f7-483a-b964-6db6c9464583', fileName: 'Aarav Kumar_Report_1767157457368.pdf'}]
+        const student = pdfData.find(s => s.studentId === studentId);
+        const file = new File([student.blob], student.fileName, { type: 'application/pdf' });
 
-        const emailData = {
-          studentId,
-          headTeacherSignature,
-          emailContent: emailTemplate || getDefaultEmailTemplate(student),
-          sentBy: teacher?.teacherId
-        };
-
-
-        console.log(emailData);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('student_id', studentId);
 
         // Call API to send email
-        const response = await fetch('http://127.0.0.1:8000/reports/send-email', {
+        const response = await fetch('http://127.0.0.1:8000/send-final-report', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(emailData),
+          
+          body: formData,
         });
       } catch (error) {
         console.error(`Error sending email for student ${studentId}:`, error);
@@ -732,19 +746,6 @@ ${schools?.schoolName || 'School'}
     setSelectedReport(null);
     setComment('');
   };
-
-  const [studentForm, setStudentForm] = useState({
-    studentId: '',
-    changedBy: null,
-    provision: ''
-  });
-    
-  const [teacherForm, setTeacherForm] = useState({
-    teacherId: '',
-    changedBy:  null,
-    offBoardingDate: null,
-    provision: ''
-  });
     
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -769,7 +770,6 @@ ${schools?.schoolName || 'School'}
       'Grade',
       'Parent Name',
       'Parent Email',
-      'SchoolId'
     ],
     validations: {
       'Student Name': { type: 'string', maxLength: 100, required: true, pattern: /^[A-Za-z\s.'-]+$/ },
@@ -789,7 +789,6 @@ ${schools?.schoolName || 'School'}
         required: true,
         pattern: /^[A-Za-z0-9\s]+$/
       },
-      'SchoolId': { type: 'number', required: true },
       'Address': { type: 'string', maxLength: 200, required: true },
       'City': { type: 'string', maxLength: 50, required: true, pattern: /^[A-Za-z\s]+$/ },
       'State': { type: 'string', maxLength: 50, required: true, pattern: /^[A-Za-z\s]+$/ },
@@ -1080,7 +1079,7 @@ ${schools?.schoolName || 'School'}
             state: row['State'],
             pin: row['Pincode'],
             classId: row['Class'],
-            schoolId: row['SchoolId'],
+            schoolId: teacher?.schoolId,
             DOB: row['DOB'],
             gender: row['Gender'],
             grade: grades.find(grade => grade.gradeLetter === row['Grade'].toUpperCase())?.gradeId || null,
@@ -1133,6 +1132,7 @@ ${schools?.schoolName || 'School'}
 
 
   const [filteredTeachers, setFilteredTeachers] = useState([]);
+  const [filteredStudent, setFilteredStudent] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -1140,21 +1140,26 @@ ${schools?.schoolName || 'School'}
   const wrapperRef = useRef(null);
 
   // Debounced API search
-  const handleSearch = async (query) => {
+  const handleSearch = async (query,user) => {
     if (query.trim() === '') {
       setFilteredTeachers([]);
+      setFilteredStudent([]);
       setShowDropdown(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      console.log(query);
-      console.log(teachers)
-      const response = teachers.filter((teacher) => (teacher.teacherName).toLowerCase().includes(query.toLowerCase()));
-      console.log(response);
-      setFilteredTeachers(response);
-      setShowDropdown(true);
+      console.log(user);
+      if(user === 'teacher'){
+        const response = teachers.filter((teacher) => (teacher.teacherName).toLowerCase().includes(query.toLowerCase()));
+        setFilteredTeachers(response);
+        setShowDropdown(true);
+      }else if(user === 'student'){
+        const response = students.filter((student) => (student.studentName).toLowerCase().includes(query.toLowerCase()));
+        setFilteredStudent(response);
+        setShowDropdown(true);
+      }
     } catch (error) {
       console.error('Search error:', error);
     } finally {
@@ -1175,6 +1180,19 @@ ${schools?.schoolName || 'School'}
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const [studentForm, setStudentForm] = useState({
+    studentId: '',
+    changedBy: null,
+    provision: ''
+  });
+    
+  const [teacherForm, setTeacherForm] = useState({
+    teacherId: '',
+    changedBy:  null,
+    offBoardingDate: null,
+    provision: ''
+  });
 
   const handleSelect = (user) => {
     if(user?.studentId){
@@ -1208,14 +1226,24 @@ ${schools?.schoolName || 'School'}
         if (provision.ok) {
           setSuccessMessage('Provision added successfully');
           setStudentForm({ studentId: '', provision: '', changedBy: null });
+
         } else {
           setErrorMessage('Provision addition failed');
+          setStudentForm({ studentId: '', provision: '', changedBy: null });
         }
+        setTimeout(() => {
+          setStudentSearch('');
+          setSuccessMessage('');
+          setErrorMessage('');
+        }, 3000);
+        
+        setShowProvisionModal(false);
       } else {
         if (!teacherForm.provision || !teacherForm.offBoardingDate) {
           alert('Please fill in all teacher fields');
           return;
         }
+        console.log(teacherForm);
 
         teacherForm.changedBy = teacher?.teacherId
         
@@ -1235,6 +1263,7 @@ ${schools?.schoolName || 'School'}
       }
       
       setTimeout(() => {
+        setTeacherSearch('');
         setSuccessMessage('');
         setErrorMessage('');
       }, 3000);
@@ -1313,6 +1342,20 @@ ${schools?.schoolName || 'School'}
       return () => clearTimeout(timer);
     }
   }, [successMessage, errorMessage]);
+
+  const [generatePdf, setGeneratePdf] = useState(false);
+  const [pdfData, setPdfData] = useState(null);
+  const SendReport = async () => {
+      setGeneratePdf(true);
+    };
+
+  const handlePdfGenerated = (pdfInfo) => {
+      console.log("PDF generated successfully:", pdfInfo);
+      setPdfData(pdfInfo?.allPdfs);
+      console.log(pdfData);
+      setGeneratePdf(false);
+      handleBulkSendEmails();
+    };
 
   if (loading) return <Loader />;
 
@@ -2207,7 +2250,7 @@ ${schools?.schoolName || 'School'}
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t">
                   <button
-                    onClick={handleBulkSendEmails}
+                    onClick={SendReport}
                     disabled={sendingEmails || !headTeacherSignature.trim()}
                     className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
@@ -2390,6 +2433,16 @@ ${schools?.schoolName || 'School'}
         </div>
       )}
 
+      {/* PDF Generation */}
+      {generatePdf && (
+          <BatchStudentReportCard
+            schoolDetail={schools}
+            studentsData={subjectScores.filter(student => (Array.from(selectedStudents)).includes(student.studentId))}
+            headTeacherSignature={headTeacherSignature}
+            onBatchComplete={handlePdfGenerated}
+          />
+        )}
+
       {/* Provision Modal */}
       {showProvisionModal && (
         <div className="w-full fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -2460,7 +2513,11 @@ ${schools?.schoolName || 'School'}
                     <div className="relative">
                       <input
                         type="text"
-                        onChange={(e) => handleSearch(e.target.value)}
+                        value={studentSearch}
+                        onChange={(e) => {
+                          setStudentSearch(e.target.value);
+                          handleSearch(e.target.value,'student')
+                        }}
                         onFocus={() => studentSearch.trim() !== '' && setShowDropdown(true)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         placeholder="Start typing to search..."
@@ -2484,7 +2541,7 @@ ${schools?.schoolName || 'School'}
                           </div>
                         ) : students.length > 0 ? (
                           <div className="max-h-60 overflow-y-auto">
-                            {students.map((student) => (
+                            {filteredStudent.map((student) => (
                               <div
                                 key={student.studentId}
                                 onClick={() => handleSelect(student)}
@@ -2536,7 +2593,11 @@ ${schools?.schoolName || 'School'}
                     <div className="relative">
                       <input
                         type="text"
-                        onChange={(e) => handleSearch(e.target.value)}
+                        value={teacherSearch}
+                        onChange={(e) => {
+                          setTeacherSearch(e.target.value);
+                          handleSearch(e.target.value,'teacher')
+                        }}
                         onFocus={() => teacherSearch.trim() !== '' && setShowDropdown(true)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         placeholder="Start typing to search..."

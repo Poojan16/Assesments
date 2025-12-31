@@ -351,3 +351,15 @@ class EmailLog(Base):
             self.status in [EmailStatus.FAILED, EmailStatus.PENDING] and 
             self.retry_count < self.max_retries
         )
+        
+class SessionLog(Base):
+    __tablename__ = "sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    userId = Column(Integer, ForeignKey("users.userId"))
+    sessionId = Column(String(255), unique=True, index=True)
+    deviceInfo = Column(JSON) 
+    loginTime = Column(TIMESTAMP, default=datetime.now)
+    lastActivity = Column(TIMESTAMP, default=datetime.now)
+    expiresAt = Column(TIMESTAMP, default=datetime.now)
+    isActive = Column(Boolean, default=True)

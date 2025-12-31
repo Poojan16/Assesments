@@ -33,17 +33,17 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler()
     # scheduler.add_job(
     #     schedule_annual_notifications,
-    #     IntervalTrigger(minutes=1),  
+    #     IntervalTrigger(seconds=30),  
     #     id="hourly_notification_check",
     #     replace_existing=True
     # )
     central_email_service = CentralEmailService(SessionLocal(), EmailNotificationSystem(SessionLocal()))
-    # scheduler.add_job(
-    #     central_email_service.central_email_system,
-    #     IntervalTrigger(minutes=1),  
-    #     id="hourly_email_check",
-    #     replace_existing=True
-    # )
+    scheduler.add_job(
+        central_email_service.central_email_system,
+        IntervalTrigger(minutes=1),  
+        id="hourly_email_check",
+        replace_existing=True
+    )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -363,3 +363,17 @@ async def background_testing(background_tasks: BackgroundTasks, metadatas: Optio
     )
     background_tasks.add_task(email._send_message_with_retry_and_rate_limit, emailRequest, metadatas)
     return {"message": "Email sending initiated in the background"}
+
+@app.get("/sessions")
+async def sessions():
+    try:
+        db = SessionLocal()
+        sessions = db.query(SessionLog).all()
+        return {
+            "status_code": 200,
+            "success": True,
+            "data": sessions,
+            "message": "Sessions fetched successfully",
+        }
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))

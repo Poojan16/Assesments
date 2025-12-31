@@ -32,7 +32,6 @@ import TopSchoolsDashboard from './components/admin_dashboard_prac';
 import SubjectReportCard from './components/subjectReport';
 import ReportConfirmationSystem from './components/admin_dashboard_prac';
 import MyPdfViewer from './components/pdfViewer';
-import AddSchoolForm from './components/schoolForm';
 import ClassTeacherDashboard from './components/schoolPage';
 import { LoadingProvider } from './loadingContext';
 import GlobalLoader from './components/GlobalLoader';
@@ -40,6 +39,7 @@ import UnauthorizedPage from './components/Unauthorised';
 import ParentComponent from './components/update-task1';
 import EducationDashboard from './components/admin_dashboard_prac';
 import SchoolPerformanceScatter from './components/update-task1';
+import AddSchoolForm from './components/schoolAdd';
 
 function App() {
 

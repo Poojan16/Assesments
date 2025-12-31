@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 const BatchStudentReportCard = ({ 
   schoolDetail, 
   studentsData, // Array of student objects
+  headTeacherSignature = '',
   onBatchComplete 
 }) => {
   console.log(studentsData);
@@ -322,15 +323,18 @@ const BatchStudentReportCard = ({
           )}
 
           {/* Signature Section */}
-          <div className="px-8 pb-8 border-t-2 border-gray-200 pt-8">
-            <div className="flex justify-end items-end">
-              <div className="text-center">
-                <div className="w-48 border-b-2 border-gray-800 mb-2 pb-16"></div>
-                <div className="font-semibold text-gray-900">Class Teacher's Signature</div>
-                <div className="text-sm text-gray-600 mt-1">{currentStudent.headTeacher}</div>
+          {
+            headTeacherSignature != '' && (
+              <div className="px-8 pb-8 justify-end">
+                <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-6">
+                  <h3 className="font-bold text-gray-900 mb-3 text-lg flex items-center gap-2">
+                    <span>👷</span> Head Teacher's Signature
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed italic">{headTeacherSignature}</p>
+                </div>
               </div>
-            </div>
-          </div>
+            )
+          }
 
           {/* Footer */}
           <div className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white text-center py-4">

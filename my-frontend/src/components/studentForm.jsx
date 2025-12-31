@@ -383,9 +383,7 @@ export default function StudentForm() {
             // Refresh the data
             fetchStudentData();
             // Re-enable form
-            for (let i = 0; i < formElements.length; i++) {
-              formElements[i].disabled = false;
-            }
+            handleReset();
           } else {
             handleReset();
           }

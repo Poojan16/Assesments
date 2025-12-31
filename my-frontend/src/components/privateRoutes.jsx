@@ -1,11 +1,11 @@
     // components/ProtectedRoute.jsx
-    import React from 'react';
+    import React, { useEffect, useState } from 'react';
     import { useSelector } from 'react-redux';
     import { Navigate, Outlet } from 'react-router-dom';
+    import { logout } from '../authSlice';
 
     const ProtectedRoute = ({ allowedRoles = [] }) => {
         const { isAuthenticated, user } = useSelector((state) => state.auth);
-        console.log("User",user)
 
         if (!isAuthenticated) {
             return <Navigate to="/" replace />;

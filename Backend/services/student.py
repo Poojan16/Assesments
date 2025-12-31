@@ -77,7 +77,7 @@ async def create_student(
     schoolId: int = Form(...),
     address: str =  Form(...),
     iStatus: Optional[bool] = Form(False),
-    aadhar: Union[UploadFile, None] = File(None),
+    adhaar: Union[UploadFile, None] = File(None),
     birthCertificate: Union[UploadFile, None] = File(None),
     country: str = Form(...),
     city: str = Form(...),
@@ -110,16 +110,16 @@ async def create_student(
                 parentEmail=parentEmail,
                 parentContact=parentContact,
                 parentRelation=parentRelation,
-                adhaar=parentAadhar
+                parentAdhaar=parentAadhar
             )
             db.add(db_parent)
             db.commit()
             db.refresh(db_parent)
 
         # Student documents (optional check)
-        if aadhar:
+        if adhaar:
             try:
-                aadhar = (await upload_and_encrypt_file(aadhar, 'students/'))["file_url"]
+                adhaar = (await upload_and_encrypt_file(adhaar, 'students/'))["file_url"]
             except:
                 raise HTTPException(status_code=500, detail="Aadhar not uploaded")
 
@@ -146,7 +146,7 @@ async def create_student(
             schoolId=schoolId,
             address=address,
             iStatus=iStatus,
-            adhaar=aadhar,
+            adhaar=adhaar,
             birthCertificate=birthCertificate,
             city=city,
             state=state,

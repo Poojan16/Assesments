@@ -16,6 +16,8 @@ from dotenv import load_dotenv, find_dotenv,set_key
 from redis_client import save_reset_token,mark_token_used
 from routers.audit import post_user_audit
 import logging
+import uuid
+from sqlalchemy import delete
 
 load_dotenv()
 
@@ -228,101 +230,95 @@ async def decodelink(link):
         raise httpException(status_code=400, detail=str(e))
 
 async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depends(get_db)):
-    # Validate inputs
     if not user_data.email:
         return {"status_code": 400, "detail": "Email is required"}
     if not user_data.password:
         return {"status_code": 400, "detail": "Password is required"}
 
-    # Get User-Agent
     user_agent_string = request.headers.get("User-Agent")
+    # print(user_agent_string)
     if not user_agent_string:
         raise HTTPException(status_code=400, detail="User-Agent header missing")
 
     ua = parse(user_agent_string)
-    current_device_type = "mobile" if ua.is_mobile else ("tablet" if ua.is_tablet else "desktop")
+    current_device_type = ua.device or "Unknown"
     current_os = ua.os.family or "Unknown"
     current_browser = ua.browser.family or "Unknown"
 
-    # Fetch user
     user_info = (
         db.query(User)
         .filter(User.userEmail == user_data.email)
         .first()
     )
-
+    
     if not user_info:
         raise HTTPException(status_code=404, detail="User not found")
 
     if not check_password(user_data.password, user_info.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Fetch login info
     existing_info = (
-        db.query(Login)
-        .filter(Login.email == user_data.email)
+        db.query(SessionLog)
+        .filter(SessionLog.userId == user_info.userId, SessionLog.isActive == True)
         .first()
     )
 
     client_ip = request.client.host
     
     mark = db.query(Role).filter(Role.roleId == user_info.role).first().mark
+    
 
-    # If login matched previous device
     if existing_info:
-        try:
-            different_device = (
-                existing_info.ip != client_ip or
-                existing_info.device != current_device_type or
-                existing_info.os != current_os or
-                existing_info.browser != current_browser
-            )
+        db.delete(existing_info)
+        db.commit()
+        new_login = SessionLog(
+            userId=user_info.userId,
+            sessionId=uuid.uuid4().hex,
+            deviceInfo={
+                "device": current_device_type,
+                "os": current_os,
+                "browser": current_browser,
+                "ip": client_ip
+            },
+            loginTime=datetime.now(),
+            lastActivity=datetime.now(),
+            expiresAt=datetime.now()+timedelta(days=1),
+            isActive=True
+        )
+        db.add(new_login)  
+        db.commit()
+        user_info.token = new_login.sessionId
+        await post_user_audit(user_info.userId, "user logged in")
+        return {
+            "statusCode": 200,
+            "message": "You have logged in with the same device",
+            "data": user_info,
+            "mark": mark
+        }
 
-            existing_info.loginTime = datetime.now()
-            db.add(existing_info)
-            
-            print(jsonable_encoder(user_info))
-
-            if different_device:
-                db.query(Login).filter(Login.email == user_data.email).update({
-                    "ip": client_ip,
-                    "device": current_device_type,
-                    "os": current_os,
-                    "browser": current_browser
-                })
-                await post_user_audit(user_info.userId, "user logged in with a different device")
-                return {
-                    "statusCode": 200,
-                    "message": "You have logged in from a different device.",
-                    "data": user_info,
-                    "mark": mark
-                }
-            
-            await post_user_audit(user_info.userId, "user logged in")
-
-
-            return {
-                "statusCode": 200,
-                "message": "Login successful.",
-                "data": user_info,
-                "mark": mark
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    # No previous login, create new entry
-    new_login = Login(
-        email=user_data.email,
-        ip=client_ip,
-        device=current_device_type,
-        os=current_os,
-        browser=current_browser,
-        loginTime=datetime.now()
-    )
-    db.add(new_login)
-    db.commit()
+    try:
+        new_login = SessionLog(
+            userId=user_info.userId,
+            sessionId=uuid.uuid4().hex,
+            deviceInfo={
+                "device": current_device_type,
+                "os": current_os,
+                "browser": current_browser,
+                "ip": client_ip
+            },
+            loginTime=datetime.now(),
+            lastActivity=datetime.now(),
+            expiresAt=datetime.now()+timedelta(days=1),
+            isActive=True
+        )
+        db.add(new_login)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     
     print(user_info)
+    user_info.token = new_login.sessionId
     
     await post_user_audit(user_info.userId, "user logged in")
 
@@ -332,8 +328,3 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         "data": user_info,
         "mark": mark
     }
-
-    
-
-
-

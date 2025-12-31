@@ -158,6 +158,8 @@ const StudentReportCard = () => {
     }
   };
 
+  
+
   // Comments Management
   const addComment = () => {
     if (!newComment.trim()) return;
@@ -192,6 +194,8 @@ const StudentReportCard = () => {
       .then(data => {
         console.log(data);
         setPopupMsg('Report approved');
+        setSelectedReport(null);
+
         setComment('');
         
         setTimeout(() => setPopupMsg(''), 3000);
@@ -226,6 +230,7 @@ const StudentReportCard = () => {
         console.log(data);
         setPopupMsg('Report rejected successfully');
         setComment('');
+        setSelectedReport(null);
         setTimeout(() => setPopupMsg(''), 3000);
       })
       .catch(error => {
@@ -341,7 +346,14 @@ const StudentReportCard = () => {
     }
   };
 
-  console.log(selectedReport);
+  const handlePrint = () => {
+    if(!signature) {
+      setPopupMsg('Please add signature first');
+      setTimeout(() => setPopupMsg(''), 3000);
+      return;
+    }
+    window.print();
+  }
 
   if (loading) return <Loader />;
 
@@ -360,7 +372,7 @@ const StudentReportCard = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 mb-6 print:hidden">
           <button
-            onClick={() => window.print()}
+            onClick={() => handlePrint()}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl"
           >
             <Download size={20} />
@@ -433,7 +445,7 @@ const StudentReportCard = () => {
               </div>
 
               {/* Student Info */}
-              <div className="p-8 border-b border-gray-200">
+              <div className="image p-8 border-b border-gray-200">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
                     <div className="space-y-3">
@@ -786,6 +798,7 @@ const StudentReportCard = () => {
         @media print {
           body { margin: 0; }
           .print\\:hidden { display: none !important; }
+          .image : {display: flex, justify-content: center; align-items: center;}
         }
         @keyframes fade-in {
           from { opacity: 0; transform: translateY(-10px); }

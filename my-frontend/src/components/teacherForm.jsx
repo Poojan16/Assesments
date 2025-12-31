@@ -88,6 +88,10 @@ export default function AddTeacherForm() {
     }
   });
 
+  const allFields = watch();
+
+  console.log(allFields);
+
   const [teachers, setTeachers] = useState([]);
   const [serverError, setServerError] = useState('');
 
@@ -121,7 +125,6 @@ export default function AddTeacherForm() {
 
         const rolesData = await rolesResponse.json();
         const teacherData = await teacherResponse.json();
-
         setRoles(rolesData?.data);
         setTeachers(teacherData?.data);
       } catch (error) {
@@ -211,11 +214,14 @@ export default function AddTeacherForm() {
     { label: 'Master of Technology', value: 'M.Tech' },
   ];
 
+  console.log(roles[0]?.roleId);
   // Format roles for react-select
   const roleOptions = roles.map(role => ({
-    value: role.roleId,
-    label: role.roleName
+    value: role?.roleName,
+    label: role?.roleName
   }));
+
+  console.log(roleOptions);
 
   const handleEmail = async () => {
     try {
@@ -813,7 +819,8 @@ export default function AddTeacherForm() {
                     value={selectedRole}
                     onChange={(option) => {
                       setSelectedRole(option);
-                      setValue('role', option?.value || '');
+                      console.log(option);
+                      setValue('role', option?.value);
                     }}
                     placeholder="Search role..."
                     isSearchable

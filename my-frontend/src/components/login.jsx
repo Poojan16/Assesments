@@ -30,7 +30,6 @@ const LoginPage = () => {
     const email = watch('email');
 
     const auths = localStorage.getItem('authState');
-    console.log(auths)
 
   const onSubmit = async (data) => {
   
@@ -61,9 +60,6 @@ const LoginPage = () => {
         
           const userRole = data?.data || {};
           console.log(userRole);
-
-          
-
           dispatch(loginSuccess(userRole));
 
           console.log(data)

@@ -34,7 +34,7 @@ async def create_teacher(
     state: str = Form(...),
     pin: int = Form(...),
     qualification: str = Form(...),
-    role: int = Form(...),
+    role: str = Form(...),
     schoolId: int = Form(...),
     DOB: date = Form(...),
     gender: GenderEnum = Form(...),

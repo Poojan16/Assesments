@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 # Database connection details
 DATABASE_URL = f"mysql+pymysql://{os.getenv('DB_USER')}:{quote(os.getenv('DB_PASSWORD'))}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}?charset=utf8mb4"
-engine = create_engine(DATABASE_URL, pool_recycle=3600, pool_size=50, max_overflow=60)
+engine = create_engine(DATABASE_URL, pool_recycle=3600, pool_size=60, max_overflow=70)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 # Base class for declarative models

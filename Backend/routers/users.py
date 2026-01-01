@@ -95,6 +95,14 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         return user_info
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
+
+@router.get("/logout")
+async def logout(sessionId: str, db: SessionLocal = Depends(get_db)):
+    try:
+        user_info = await users.logout(sessionId, db)
+        return user_info
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
     
 @router.get("/logins")
 async def get_user_logins(email: str):

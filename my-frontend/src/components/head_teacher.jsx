@@ -13,7 +13,7 @@ import { saveAs } from 'file-saver';
 import Loader from './loader';
 import { useDispatch, useSelector } from 'react-redux';
 import * as XLSX from 'xlsx';
-import { initializeAuth, logout } from '../authSlice';
+import { initializeAuth, logout, validateSessionOnLoad } from '../authSlice';
 import BatchStudentReportCard from './subjectReport';
 
 const HeadTeacher = () => {
@@ -22,7 +22,7 @@ const HeadTeacher = () => {
 
   useEffect(() => {
     // Initialize auth from localStorage on app load
-    dispatch(initializeAuth());
+    dispatch(validateSessionOnLoad());
   }, [dispatch]);
 
 
@@ -747,11 +747,19 @@ ${schools?.schoolName || 'School'}
     setComment('');
   };
     
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      dispatch(logout());
-    }
-  };
+  const handleLogout = async () => {
+      if (window.confirm('Are you sure you want to logout?')) {
+        const logOut = await fetch(`http://127.0.0.1:8000/users/logout?sessionId=${user.token}`)
+        const data = await logOut.json();
+        console.log(data);
+        if(data?.status_code){
+          dispatch(logout());
+          navigate('/');
+        }else{
+          alert(data?.detail);
+        }
+      }
+    };
         
   // Template configuration for student import
   const [importValidationErrors, setImportValidationErrors] = useState([]);

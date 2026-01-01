@@ -60,7 +60,12 @@ const LoginPage = () => {
         
           const userRole = data?.data || {};
           console.log(userRole);
-          dispatch(loginSuccess(userRole));
+          dispatch(loginSuccess({
+            data: userRole,
+            token: userRole.token,
+            mark: data.mark,
+            expired: userRole.expiresAt,
+          }));
 
           console.log(data)
 
@@ -79,27 +84,27 @@ const LoginPage = () => {
   const handleForm = (data) => {
     if(data){
       if (Data?.mark === "A") {
-        setSuccessMessage("Login Successful")
+        setSuccessMessage(Data?.message)
         const timer = setTimeout(() => {
           setSuccessMessage(null);
           navigate("/admin");
-        }, 2000); // 10 seconds
+        }, 5000); // 10 seconds
 
         return () => clearTimeout(timer);
       } else if (Data?.mark === "HT") {
-        setSuccessMessage("Login Successful")
+        setSuccessMessage(Data?.message)
         const timer = setTimeout(() => {
           setSuccessMessage(null);
           navigate("/head-teacher");
-        }, 2000); // 10 seconds
+        }, 5000); // 10 seconds
 
         return () => clearTimeout(timer);
       }else if (Data?.mark === "ST") {
-        setSuccessMessage("Login Successful")
+        setSuccessMessage(Data?.message)
         const timer = setTimeout(() => {
           setSuccessMessage(null);
           navigate("/class-teacher");
-        }, 2000); // 10 seconds
+        }, 5000); // 10 seconds
 
         return () => clearTimeout(timer);
       } 
@@ -125,7 +130,7 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className='flex flex items-center justify-center bg-white rounded-lg shadow-md'>
+        <div className='flex flex items-center justify-center bg-white rounded-lg shadow-md p-5'>
         <div className='flex flex-col items-center bg-white p-8 py-[60px] w-full max-w-md'>
           <img src="https://rawafedschool.com/wp-content/uploads/2024/06/AnyConv.com__the-boy-was-very-happy.webp" alt="" srcset="" />
           <p className='text-2xl italic mt-5'>Student Grading System</p>

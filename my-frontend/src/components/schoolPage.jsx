@@ -2216,6 +2216,10 @@ const ClassTeacherDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
+
+  const url = process.env.REACT_APP_BACKEND_URL;
+  console.log('.env url:',url)
+
   // Fetch teacher data
   useEffect(() => {
     const fetchTeacher = async () => {
@@ -2679,7 +2683,7 @@ const ClassTeacherDashboard = () => {
   // Check if all subjects are signed for a student
   const isAllSubjectsSigned = (studentId) => {
     if (!Array.isArray(signatures)) return false;
-    return teacherSubjects.every(subject => {
+    return subjects.every(subject => {
       return signatures.some(signature => 
         signature.subjectId === subject.subjectId && 
         signature.studentId === studentId
@@ -3077,9 +3081,24 @@ const ClassTeacherDashboard = () => {
 
   const handlePdfGenerated = (pdfInfo) => {
     console.log("PDF generated successfully:", pdfInfo);
-    // setPdfData(pdfInfo);
+    setPdfData(pdfInfo);
     setGeneratePdf(false);
   };
+
+
+  const handleLogout = async () => {
+      if (window.confirm('Are you sure you want to logout?')) {
+        const logOut = await fetch(`http://127.0.0.1:8000/users/logout?sessionId=${user.token}`)
+        const data = await logOut.json();
+        console.log(data);
+        if(data?.status_code){
+          dispatch(logout());
+          navigate('/');
+        }else{
+          alert(data?.detail);
+        }
+      }
+    };
 
   if (loading) return <Loader />;
 
@@ -3146,7 +3165,7 @@ const ClassTeacherDashboard = () => {
                             </p>
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-xs text-gray-400">
-                                {new Date(item.created_at).toLocaleDateString('en-US', {
+                                {new Date(item.created_at).toLocaleDateString('en-Gb', {
                                   month: 'short',
                                   day: 'numeric',
                                   hour: '2-digit',
@@ -3227,7 +3246,7 @@ const ClassTeacherDashboard = () => {
                 Export
               </button>
               <button
-                onClick={() => dispatch(logout())}
+                onClick={handleLogout}
                 className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
               >
                 <LogOut size={18} />
@@ -3478,7 +3497,7 @@ const ClassTeacherDashboard = () => {
                       <div className="text-sm text-gray-500">
                         {selectedStudents.size > 0 
                           ? "Complete all scores and signatures for selected students"
-                          : "Select students to send reports"}
+                          : "*Only the teacher assigned to the student's last completed subject has the authority to submit the report"}
                       </div>
                     )}
                   </div>
@@ -3751,7 +3770,7 @@ const ClassTeacherDashboard = () => {
               {reports.length > 0 ? (
                 reports.map(report => (
                   <div
-                    key={report.reviewId || report.id}
+                    key={report.reportId }
                     onClick={() => setSelectedReport(report)}
                     className="flex items-center bg-white mb-3 justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition"
                   >
@@ -3763,7 +3782,7 @@ const ClassTeacherDashboard = () => {
                         Teacher: {report.teacherId === teacher.teacherId ? teacher.teacherName : 'Unknown'}
                       </p>
                       <p className="text-sm text-gray-500">
-                        Submitted: {new Date(report.createdAt || Date.now()).toLocaleDateString()}
+                        Submitted: {new Date(report.created_at || Date.now()).toLocaleDateString()}
                       </p>
                       <p className={`text-sm text-gray-500 flex items-center`}>
                         Status: <p className={`font-bold ${report.status ? 'text-green-600' : 'text-red-600'}`}>{report.status ? 'Approved' : 'Pending'}</p>
@@ -3960,6 +3979,67 @@ const ClassTeacherDashboard = () => {
             </div>
           </Modal>
         )}
+
+{selectedReport && (
+        <Modal
+          title={`${selectedReport.comments} Report`}
+          onClose={() => setSelectedReport(null)}
+          width="max-w-5xl"
+        >
+          <div className="space-y-6">
+            {/* Zoom Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                >
+                  <ZoomOut size={18} />
+                  Zoom Out
+                </button>
+                <span className="font-medium bg-gray-100 px-4 py-2 rounded-lg">
+                  {zoomLevel}%
+                </span>
+                <button
+                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                >
+                  <ZoomIn size={18} />
+                  Zoom In
+                </button>
+              </div>
+              
+              <div className={`px-4 py-2 rounded-lg ${selectedReport.status === true ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                Status: <span className="font-bold">{selectedReport.status ? 'Approved' : 'Pending'}</span>
+              </div>
+            </div>
+
+            {/* PDF Viewer */}
+            <div className="border-2 border-gray-300 rounded-xl overflow-hidden bg-gray-50">
+              <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }}>
+                <MyPdfViewer pdfBlobUrl={selectedReport.report} />
+              </div>
+            </div>
+
+            {/* Comments Section */}
+            <div className="space-y-4">
+              <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                <MessageSquare size={20} />
+                Review Comments
+              </h4>
+              
+              {selectedReport.comments && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Current Comments:</p>
+                  <p className="text-gray-700 italic">"{selectedReport.comments}"</p>
+                </div>
+              )}
+
+        
+            </div>
+          </div>
+        </Modal>
+      )}
 
         {/* PDF Generation */}
         {generatePdf && (

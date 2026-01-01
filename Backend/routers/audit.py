@@ -41,10 +41,11 @@ async def get_user_audits():
 
 @router.post("/user_audits")
 async def post_user_audit(
-    user_id: int, activity: str
+    user_id: int, activity: str,
+    sessionId: int
 ):
     try:
-        user_audit = await audit.post_user_audit(user_id, activity)
+        user_audit = await audit.post_user_audit(user_id, activity, sessionId)
         return user_audit
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

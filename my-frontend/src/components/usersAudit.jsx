@@ -75,19 +75,24 @@ const UserAudit = () => {
         for (const audit of auditData) {
             const users = await fetch(`http://127.0.0.1:8000/users/id?user_id=${Number(audit.user_id)}`);
             const userData = await users.json();
-            audit.user_id = (userData?.data)?.userName
             if(userData?.data){
-              const userLongins = await fetch(`http://127.0.0.1:8000/users/logins?email=${userData?.data?.userEmail}`);
+              const userLongins = await fetch(`http://127.0.0.1:8000/sessions`);
               const userLoginData = await userLongins.json();
               const LoginData = userLoginData?.data
-              audit.email = LoginData?.email
-              audit.ip = LoginData?.ip
-              audit.device = LoginData?.device
-              audit.os = LoginData?.os
-              audit.browser = LoginData?.browser
-              audit.login_time = LoginData?.loginTime
+              const userSession = LoginData.find(device => device.userId === audit.user_id && device.id === audit.sessionId);
+              const deviceDetails = userSession?.deviceInfo;
+              console.log(userSession)
+              audit.email = (userData?.data)?.userEmail
+              audit.ip = deviceDetails?.ip
+              audit.device =  deviceDetails?.device
+              audit.os = deviceDetails?.os
+              audit.browser = deviceDetails?.browser
+              audit.login_time = new Date(userSession.loginTime).toLocaleString('en-Gb')
+              audit.status = userSession?.isActive ? 'Active' : 'Inactive'
+              audit.user_id = (userData?.data)?.userName
             }
         }
+        console.log(auditData)
         setAudit(auditData);
       } catch (error) {
         console.error('Failed to fetch dropdowns', error);
@@ -145,6 +150,7 @@ const UserAudit = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Browser</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Login Time</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -159,6 +165,7 @@ const UserAudit = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.browser}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.login_time).toLocaleTimeString('en-US')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.activity}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.status}</td>
               </tr>
             ))}
           </tbody>

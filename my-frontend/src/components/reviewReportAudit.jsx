@@ -50,6 +50,7 @@ const ReviewReportAudit = () => {
   const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState([]);
   const [reports, setReports] = useState([]);
+  const [roles, setRoles] = useState([]);
 
   useEffect(() => {
     // Simulate a loading process (e.g., data fetching, component mounting)
@@ -68,24 +69,28 @@ const ReviewReportAudit = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [workFlowResponse, teachersResponse, reportsResponse] = await Promise.all
+        const [workFlowResponse, teachersResponse, reportsResponse, rolesResponse] = await Promise.all
         ([
           fetch('http://127.0.0.1:8000/teachers/workflowAudit'),
           fetch('http://127.0.0.1:8000/teachers/'),
-          fetch('http://127.0.0.1:8000/teachers/getWorkflow_all')
+          fetch('http://127.0.0.1:8000/teachers/getWorkflow_all'),
+          fetch('http://127.0.0.1:8000/roles')
         ])
 
         if (!workFlowResponse.ok) throw new Error(`HTTP error! status: ${workFlowResponse.status}`);
         if (!teachersResponse.ok) throw new Error(`HTTP error! status: ${teachersResponse.status}`);
         if (!reportsResponse.ok) throw new Error(`HTTP error! status: ${reportsResponse.status}`);
+        if (!rolesResponse.ok) throw new Error(`HTTP error! status: ${rolesResponse.status}`);
 
         const workFlowData = await workFlowResponse.json();
         const teachersData = await teachersResponse.json();
         const reportsData = await reportsResponse.json();
+        const rolesData = await rolesResponse.json();
 
         setAudit(workFlowData?.data);
         setTeachers(teachersData?.data);
         setReports(reportsData?.data);
+        setRoles(rolesData?.data);
       } catch (error) {
         console.error('Failed to fetch dropdowns', error);
       } finally {
@@ -147,7 +152,7 @@ const ReviewReportAudit = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleDateString('en-Gb')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.reviewId}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teachers.find((teacher) => teacher.teacherId === log.teacherId)?.teacherName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teachers.find((teacher) => teacher.teacherId === log.teacherId)?.role}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{roles.find((role) => role.roleId === teachers.find((teacher) => teacher.teacherId === log.teacherId)?.role)?.roleName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{reports.find((report) => report.reportId === log.reportId)?.comments}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{audit.find((audit) => audit.reviewId === log.reviewId)?.comments}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teachers.find((teacher) => teacher.teacherId === log.teacherId)?.teacherName}</td>

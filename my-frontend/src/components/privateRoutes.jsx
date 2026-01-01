@@ -2,10 +2,13 @@
     import React, { useEffect, useState } from 'react';
     import { useSelector } from 'react-redux';
     import { Navigate, Outlet } from 'react-router-dom';
-    import { logout } from '../authSlice';
+    import { logout, selectIsAuthenticated, selectSessionChecked } from '../authSlice';
 
     const ProtectedRoute = ({ allowedRoles = [] }) => {
-        const { isAuthenticated, user } = useSelector((state) => state.auth);
+        const { user } = useSelector((state) => state.auth);
+        const isAuthenticated = useSelector(selectIsAuthenticated);
+        const sessionChecked = useSelector(selectSessionChecked);
+        console.log(isAuthenticated,sessionChecked)
 
         if (!isAuthenticated) {
             return <Navigate to="/" replace />;

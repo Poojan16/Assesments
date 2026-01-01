@@ -241,7 +241,7 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         raise HTTPException(status_code=400, detail="User-Agent header missing")
 
     ua = parse(user_agent_string)
-    current_device_type = ua.device or "Unknown"
+    current_device_type = ua.device.family if ua.device.family != "Other" else "Desktop"
     current_os = ua.os.family or "Unknown"
     current_browser = ua.browser.family or "Unknown"
 
@@ -269,7 +269,8 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
     
 
     if existing_info:
-        db.delete(existing_info)
+        existing_info.expiresAt = datetime.now()
+        existing_info.isActive = False
         db.commit()
         new_login = SessionLog(
             userId=user_info.userId,
@@ -288,10 +289,11 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         db.add(new_login)  
         db.commit()
         user_info.token = new_login.sessionId
-        await post_user_audit(user_info.userId, "user logged in")
+        user_info.expiresAt = new_login.isActive
+        await post_user_audit(user_info.userId, "user logged in", new_login.id)
         return {
             "statusCode": 200,
-            "message": "You have logged in with the same device",
+            "message": "All set! You've logged out from your other device and can continue here.",
             "data": user_info,
             "mark": mark
         }
@@ -317,10 +319,9 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     
-    print(user_info)
     user_info.token = new_login.sessionId
-    
-    await post_user_audit(user_info.userId, "user logged in")
+    user_info.expiresAt = new_login.isActive
+    await post_user_audit(user_info.userId, "user logged in", new_login.id)
 
     return {
         "statusCode": 200,
@@ -328,3 +329,15 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         "data": user_info,
         "mark": mark
     }
+    
+async def logout(sessionId: str, db: SessionLocal = Depends(get_db)):
+    try:
+        db.query(SessionLog).filter(SessionLog.sessionId == sessionId).update({"isActive": False})
+        db.commit()
+        return {
+            "status_code": 200,
+            "success": True,
+            "message": "Logout successful.",
+        }
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))

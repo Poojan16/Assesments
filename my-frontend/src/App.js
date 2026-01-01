@@ -40,8 +40,15 @@ import ParentComponent from './components/update-task1';
 import EducationDashboard from './components/admin_dashboard_prac';
 import SchoolPerformanceScatter from './components/update-task1';
 import AddSchoolForm from './components/schoolAdd';
+import { useDispatch } from 'react-redux';
+import { checkAndInitializeAuth, validateSessionOnLoad } from './authSlice';
 
 function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(validateSessionOnLoad());
+  }, [dispatch]);
 
   return (
  

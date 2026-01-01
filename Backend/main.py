@@ -38,12 +38,12 @@ async def lifespan(app: FastAPI):
     #     replace_existing=True
     # )
     central_email_service = CentralEmailService(SessionLocal(), EmailNotificationSystem(SessionLocal()))
-    scheduler.add_job(
-        central_email_service.central_email_system,
-        IntervalTrigger(minutes=1),  
-        id="hourly_email_check",
-        replace_existing=True
-    )
+    # scheduler.add_job(
+    #     central_email_service.central_email_system,
+    #     IntervalTrigger(minutes=1),  
+    #     id="hourly_email_check",
+    #     replace_existing=True
+    # )
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -365,14 +365,18 @@ async def background_testing(background_tasks: BackgroundTasks, metadatas: Optio
     return {"message": "Email sending initiated in the background"}
 
 @app.get("/sessions")
-async def sessions():
+async def sessions(sessionId:str):
     try:
         db = SessionLocal()
-        sessions = db.query(SessionLog).all()
+        sessions = db.query(SessionLog).filter(SessionLog.sessionId == sessionId).first()
         return {
             "status_code": 200,
             "success": True,
-            "data": sessions,
+            "data": {
+                "expired": False if sessions.isActive else True,
+                "valid": sessions.isActive,
+                "expiresAt": sessions.expiresAt
+            },
             "message": "Sessions fetched successfully",
         }
     except Exception as e:

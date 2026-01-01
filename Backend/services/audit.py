@@ -55,11 +55,11 @@ async def get_user_audits():
         db.close()
 
 async def post_user_audit(
-    user_id: int, activity: str
+    user_id: int, activity: str, sessionId
 ):
     try:
         db = SessionLocal()
-        user_audit = UserAudit(user_id=user_id, activity=activity)
+        user_audit = UserAudit(user_id=user_id, activity=activity, sessionId=sessionId)
         db.add(user_audit)
         db.commit()
         db.refresh(user_audit)

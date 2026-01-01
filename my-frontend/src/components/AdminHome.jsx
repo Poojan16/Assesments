@@ -2012,10 +2012,17 @@ const AdminDashboard2 = () => {
     setDiscontinueModal(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      dispatch(logout());
-      navigate('/');
+      const logOut = await fetch(`http://127.0.0.1:8000/users/logout?sessionId=${user.token}`)
+      const data = await logOut.json();
+      console.log(data);
+      if(data?.status_code){
+        dispatch(logout());
+        navigate('/');
+      }else{
+        alert(data?.detail);
+      }
     }
   };
 

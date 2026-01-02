@@ -31,10 +31,12 @@ const LoginPage = () => {
 
     const auths = localStorage.getItem('authState');
 
+    const backend_url = process.env.REACT_APP_BACKEND_URL;
+
   const onSubmit = async (data) => {
   
         try {
-          const url = "http://127.0.0.1:8000/users/login";
+          const url = `${backend_url}/users/login`;
           const method = "POST";
         
           const response = await fetch(url, {
@@ -82,6 +84,7 @@ const LoginPage = () => {
   }; 
  
   const handleForm = (data) => {
+    console.log(data)
     if(data){
       if (Data?.mark === "A") {
         setSuccessMessage(Data?.message)
@@ -127,6 +130,12 @@ const LoginPage = () => {
       bot.classList.remove('hidden')
     }
   }
+
+  useEffect(()=>{
+    if(Data){
+      handleFormData(Data)
+    }
+  },[])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

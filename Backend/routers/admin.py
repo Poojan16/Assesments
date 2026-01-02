@@ -2,8 +2,8 @@ from fastapi import APIRouter
 from models import *
 from database import *
 from fastapi import HTTPException
-from fastapi import Form, File, UploadFile
-from typing import List, Union
+from fastapi import Form, File, UploadFile, Query
+from typing import List, Union, Optional
 from uploadFile import *
 from services import admin
 
@@ -16,14 +16,35 @@ router = APIRouter(
 # Admin APIs:
 # - avg performace of all schools month wise
 
-
 @router.get("/schools")
 async def get_schools():
     try:
         schools = await admin.get_schools()
         return schools
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't load the list of schools")
+
+@router.post("/filterSchools")
+async def get_schools(
+    searchTerm: Optional[str] = Form(...),
+    filterCity: Optional[str] = Form(...),
+    filterState: Optional[str] = Form(...),
+    filterPincode: Optional[str] = Form(...),
+    limit: int = Query(8, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    try:
+        schools = await admin.filtered_schools(
+            searchTerm,
+            filterCity,
+            filterState,
+            filterPincode,
+            limit,
+            offset
+        )
+        return schools
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Couldn't load the list of schools")
  
 @router.get("/schools/{schoolId}")       
 async def get_school(schoolId: int):
@@ -40,7 +61,7 @@ async def get_teachers():
         teachers = await admin.get_teachers()
         return teachers
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't load the list of teachers")
 
 
 @router.get("/students")
@@ -49,7 +70,7 @@ async def get_students():
         students = await admin.get_students()
         return students
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't load the list of students")
 
 @router.post("/schools")
 async def schools(
@@ -89,4 +110,4 @@ async def schools(
         )
         return schools
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't create new school")

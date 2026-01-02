@@ -24,10 +24,11 @@ const TeacherMapping = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [teacher, setTeacher] = useState({});
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
   useEffect(() => {
     const fetchTeacher = async (user) => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/teachers/email?email=' + user.userEmail);
+        const response = await fetch(`${backend_url}/teachers/email?email=` + user.userEmail);
         const data = await response.json();
         setTeacher(data?.data);
       } catch (error) {
@@ -42,8 +43,8 @@ const TeacherMapping = () => {
       setIsLoading(true);
       try {
         const [classesRes, subjectsRes] = await Promise.all([
-          fetch('http://127.0.0.1:8000/classes/'),
-          fetch('http://127.0.0.1:8000/subjects/')
+          fetch(`${backend_url}/classes/`),
+          fetch(`${backend_url}/subjects/`)
         ]);
         const classesData = await classesRes.json();
         const subjectsData = await subjectsRes.json();
@@ -71,7 +72,7 @@ const TeacherMapping = () => {
     setIsSearching(true);
     console.log(teacher)
     try {
-      const response = await fetch(`http://127.0.0.1:8000/teachers/search?query=${encodeURIComponent(query)}&schoolId=${teacher?.schoolId}`);
+      const response = await fetch(`${backend_url}/teachers/search?query=${encodeURIComponent(query)}&schoolId=${teacher?.schoolId}`);
       const data = await response.json();
       setSearchResults(data?.data || []);
       setShowDropdown(true);
@@ -162,7 +163,7 @@ const TeacherMapping = () => {
     };
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/teachers/map_teacher', {
+      const response = await fetch(`${backend_url}/teachers/map_teacher`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formattedData),

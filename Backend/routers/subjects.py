@@ -18,7 +18,7 @@ async def create_subject(data: SubjectBase):
         cls = await subjects.create_subject(data)
         return cls
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating subject")
 
 
 @router.get("/")
@@ -27,7 +27,7 @@ async def get_subjects():
         allSubjects = await subjects.get_subjects()
         return allSubjects
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching subjects")
 
 
 @router.get("/id")
@@ -36,4 +36,4 @@ async def get_subject(subjectId: int):
         subject = await subjects.get_subject(subjectId)
         return subject
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching subject")

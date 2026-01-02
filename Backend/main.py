@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException,  UploadFile, File, Form, Query
+from fastapi import FastAPI, BackgroundTasks, HTTPException,  UploadFile, File, Form, Query, Body
 import math
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 import ssl
@@ -24,6 +24,7 @@ import random
 from redis_client import redis_client,get_reset_token       
 import logging
 from services.paymentConfig import *
+import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -159,40 +160,6 @@ async def add_fees():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/schools")
-async def get_schools(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100)
-) :
-    try:
-        db = SessionLocal()
-        offset = (page - 1) * page_size
-        total_records = db.query(School).count()
-        schools = db.query(School) \
-                    .order_by(School.schoolId) \
-                    .offset(offset) \
-                    .limit(page_size) \
-                    .all()
-
-        total_pages = math.ceil(total_records / page_size) if total_records > 0 else 0
-
-        return {
-            "status_code": 200,
-            "success": True,
-            "data": schools,
-            "message": "Schools fetched successfully",
-            "pagination": {
-                "page": page,
-                "page_size": page_size,
-                "total_records": total_records,
-                "total_pages": total_pages
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str('Something went wrong server side'))
-    finally:
-        if db:
-            db.close()
 
 @app.post("/transfer-student-next-class")
 async def transfer_student_next_class(classId: int, schoolId: int, studentId: Optional[int] = None):
@@ -375,6 +342,7 @@ async def sessions(sessionId:str):
             "data": {
                 "expired": False if sessions.isActive else True,
                 "valid": sessions.isActive,
+                "data":sessions,
                 "expiresAt": sessions.expiresAt
             },
             "message": "Sessions fetched successfully",

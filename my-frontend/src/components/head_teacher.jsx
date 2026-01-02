@@ -25,6 +25,8 @@ const HeadTeacher = () => {
     dispatch(validateSessionOnLoad());
   }, [dispatch]);
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
+
 
   const [showProvisionModal, setShowProvisionModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +84,7 @@ const HeadTeacher = () => {
 
         // 1. First fetch teacher by email
         const teacherRes = await fetch(
-          `http://127.0.0.1:8000/teachers/email?email=${user.userEmail}`
+          `${backend_url}/teachers/email?email=${user.userEmail}`
         );
         const teacherData = await teacherRes.json();
         setTeacher(teacherData?.data);
@@ -106,15 +108,15 @@ const HeadTeacher = () => {
           gradeResponse,
           reportsStatusResponse
         ] = await Promise.all([
-          fetch('http://127.0.0.1:8000/classes/'),
-          fetch('http://127.0.0.1:8000/subjects/'),
-          fetch('http://127.0.0.1:8000/students/'),
-          fetch('http://127.0.0.1:8000/teachers/'),
-          fetch(`http://127.0.0.1:8000/teachers/class_and_subjects?teacherId=${(teacherData?.data).teacherId}`),
-          fetch('http://127.0.0.1:8000/students/score'),
-          fetch(`http://127.0.0.1:8000/admin/schools/${(teacherData?.data)?.schoolId}`),
-          fetch('http://127.0.0.1:8000/grades/'),
-          fetch('http://127.0.0.1:8000/reports/status')
+          fetch(`${backend_url}/classes/`),
+          fetch(`${backend_url}/subjects/`),
+          fetch(`${backend_url}/students/`),
+          fetch(`${backend_url}/teachers/`),
+          fetch(`${backend_url}/teachers/class_and_subjects?teacherId=${(teacherData?.data).teacherId}`),
+          fetch(`${backend_url}/students/score`),
+          fetch(`${backend_url}/admin/schools/${(teacherData?.data)?.schoolId}`),
+          fetch(`${backend_url}/grades/`),
+          fetch(`${backend_url}/reports/status`)
         ]);
 
         const classesData = await classesResponse.json();
@@ -364,7 +366,7 @@ const HeadTeacher = () => {
         formData.append('student_id', studentId);
 
         // Call API to send email
-        const response = await fetch('http://127.0.0.1:8000/send-final-report', {
+        const response = await fetch(`${backend_url}/send-final-report`, {
           method: 'POST',
           
           body: formData,
@@ -749,7 +751,7 @@ ${schools?.schoolName || 'School'}
     
   const handleLogout = async () => {
       if (window.confirm('Are you sure you want to logout?')) {
-        const logOut = await fetch(`http://127.0.0.1:8000/users/logout?sessionId=${user.token}`)
+        const logOut = await fetch(`${backend_url}/users/logout?sessionId=${user.token}`)
         const data = await logOut.json();
         console.log(data);
         if(data?.status_code){
@@ -1099,7 +1101,7 @@ ${schools?.schoolName || 'School'}
           console.log(formattedData);
 
           // Call API to import data
-          const apiUrl = 'http://127.0.0.1:8000/students/importExcel';
+          const apiUrl = `${backend_url}/students/importExcel`;
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -1114,7 +1116,7 @@ ${schools?.schoolName || 'School'}
             setImportValidationErrors([]);
             
             // Refresh student data
-            const studentsResponse = await fetch('http://127.0.0.1:8000/students/');
+            const studentsResponse = await fetch(`${backend_url}/students/`);
             const studentData = await studentsResponse.json();
             const filteredStudent = (studentData?.data || []).filter((student) => 
               student.schoolId === (user?.schoolId || 1)
@@ -1224,7 +1226,7 @@ ${schools?.schoolName || 'School'}
         }
         studentForm.changedBy = teacher?.teacherId 
         
-        const provision = await fetch('http://127.0.0.1:8000/teachers/provision', {
+        const provision = await fetch(`${backend_url}/teachers/provision`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(studentForm),
@@ -1255,7 +1257,7 @@ ${schools?.schoolName || 'School'}
 
         teacherForm.changedBy = teacher?.teacherId
         
-        const provision = await fetch('http://127.0.0.1:8000/teachers/provision', {
+        const provision = await fetch(`${backend_url}/teachers/provision`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(teacherForm),

@@ -23,6 +23,8 @@ const StudentReportCard = () => {
     // Initialize auth from localStorage on app load
     dispatch(initializeAuth());
   }, [dispatch]);
+
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
   
   // State Management
   const [signature, setSignature] = useState(null);
@@ -145,7 +147,7 @@ const StudentReportCard = () => {
     formData.append('email', teacher?.teacherEmail)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/send-final-report', {
+      const response = await fetch(`${backend_url}/send-final-report`, {
         method: 'POST',
         body: formData
       });
@@ -186,7 +188,7 @@ const StudentReportCard = () => {
       formData.append('teacherId', teacher.teacherId);
       formData.append('status', true);
 
-      fetch('http://127.0.0.1:8000/teachers/workFlow', {
+      fetch(`${backend_url}/teachers/workFlow`, {
         method: 'POST',
         body: formData
       })
@@ -221,7 +223,7 @@ const StudentReportCard = () => {
       formData.append('teacherId', teacher.teacherId);
       formData.append('status', false);
 
-      fetch('http://127.0.0.1:8000/teachers/workFlow', {
+      fetch(`${backend_url}/teachers/workFlow`, {
         method: 'POST',
         body: formData
       })
@@ -259,7 +261,7 @@ const StudentReportCard = () => {
       try {
         // 1. First fetch teacher by email
         const teacherRes = await fetch(
-          `http://127.0.0.1:8000/teachers/email?email=${user.userEmail}`
+          `${backend_url}/teachers/email?email=${user.userEmail}`
         );
         const teacherData = await teacherRes.json();
         setTeacher(teacherData?.data);
@@ -269,13 +271,13 @@ const StudentReportCard = () => {
           return;
         }
         const [studentResponse, workflowResponse, schoolResponse, subjectResponse, gradeResponse, scoreResponse, reportTeacherResponse] = await Promise.all([
-          fetch(`http://127.0.0.1:8000/students/id?studentId=${id}`),
-          fetch(`http://127.0.0.1:8000/teachers/getWorkflow_all`),
-          fetch(`http://127.0.0.1:8000/admin/schools/${(teacherData?.data)?.schoolId}`),
-          fetch('http://127.0.0.1:8000/subjects/'),
-          fetch('http://127.0.0.1:8000/grades/'),
-          fetch('http://127.0.0.1:8000/students/score'),
-          fetch(`http://127.0.0.1:8000/teachers/`),
+          fetch(`${backend_url}/students/id?studentId=${id}`),
+          fetch(`${backend_url}/teachers/getWorkflow_all`),
+          fetch(`${backend_url}/admin/schools/${(teacherData?.data)?.schoolId}`),
+          fetch(`${backend_url}/subjects/`),
+          fetch(`${backend_url}/grades/`),
+          fetch(`${backend_url}/students/score`),
+          fetch(`${backend_url}/teachers/`),
 
         ]);
 

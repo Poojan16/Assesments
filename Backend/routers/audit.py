@@ -16,7 +16,7 @@ async def get_audits():
         audits = await audit.get_audits()
         return audits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching audits")
 
 @router.get("/id")
 async def get_audit(auditId: int):
@@ -24,7 +24,7 @@ async def get_audit(auditId: int):
         audit = await audit.get_audit(auditId)
         return audit
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching audit")
 
 
 # --------------------------------------------------------------
@@ -37,7 +37,7 @@ async def get_user_audits():
         user_audits = await audit.get_user_audits()
         return user_audits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching user audits")
 
 @router.post("/user_audits")
 async def post_user_audit(
@@ -48,4 +48,4 @@ async def post_user_audit(
         user_audit = await audit.post_user_audit(user_id, activity, sessionId)
         return user_audit
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating user audit")

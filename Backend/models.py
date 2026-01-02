@@ -58,7 +58,7 @@ class School(Base):
     __tablename__ = "schools"
 
     schoolId = Column(Integer, primary_key=True)
-    schoolName = Column(String(50), nullable=False)
+    schoolName = Column(String(255), nullable=False)
     schoolEmail = Column(String(150), nullable=False, unique=True)
     primaryContactNo = Column(String(10), nullable=False)
     secondaryContactNo = Column(String(10), nullable=False)
@@ -364,3 +364,21 @@ class SessionLog(Base):
     lastActivity = Column(TIMESTAMP, default=datetime.now)
     expiresAt = Column(TIMESTAMP, default=datetime.now)
     isActive = Column(Boolean, default=True)
+    
+class APIENUM(enum.Enum):
+    GET = 0
+    POST = 1
+
+class RESPONSEENUM(enum.Enum):
+    SUCCESS = 0
+    FAILED = 1
+    
+class Logger(Base):
+    __tablename__ = "logger"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    api = Column(String(255), nullable=False)
+    apiEnum = Column(SQLEnum(APIENUM), nullable=False)
+    responseEnum = Column(SQLEnum(RESPONSEENUM), nullable=False)
+    response = Column(String(255), nullable=False)
+    created_at = Column(TIMESTAMP, default=datetime.now)

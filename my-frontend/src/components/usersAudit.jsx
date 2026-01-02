@@ -4,42 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; // VS Code dark theme
 import Loader from './loader';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
-
-const JSONViewer = ({ data }) => (
-  <div className="bg-gray-800 p-4 rounded-lg shadow-inner overflow-x-auto">
-    <SyntaxHighlighter language="json" style={vscDarkPlus} customStyle={{ background: 'transparent', padding: 0 }}>
-      {JSON.stringify(data, null, 2)}
-    </SyntaxHighlighter>
-  </div>
-);
-
-// --- 3. Modal Component for Details ---
-const DetailsModal = ({ isOpen, onClose, oldVal, newVal }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">Audit Details</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            &times;
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-lg font-medium mb-2 text-red-600">Old Value</h3>
-            <JSONViewer data={oldVal} />
-          </div>
-          <div>
-            <h3 className="text-lg font-medium mb-2 text-green-600">New Value</h3>
-            <JSONViewer data={newVal} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+import {useSelector} from 'react-redux';
 
 // --- 4. Main Audit Table Component ---
 const UserAudit = () => {
@@ -48,6 +13,9 @@ const UserAudit = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const { token } = useSelector((state) => state.auth);
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     // Simulate a loading process (e.g., data fetching, component mounting)
@@ -66,29 +34,27 @@ const UserAudit = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://127.0.0.1:8000/audit/user_audits')
+        const response = await fetch(`${backend_url}/audit/user_audits`)
         const data = await response.json();
         if (!response.ok) { // Check for HTTP errors
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const auditData = data?.data
         for (const audit of auditData) {
-            const users = await fetch(`http://127.0.0.1:8000/users/id?user_id=${Number(audit.user_id)}`);
+            const users = await fetch(`${backend_url}/users/id?user_id=${Number(audit.user_id)}`);
             const userData = await users.json();
             if(userData?.data){
-              const userLongins = await fetch(`http://127.0.0.1:8000/sessions`);
+              const userLongins = await fetch(`${backend_url}/sessions?sessionId=${token}`);
               const userLoginData = await userLongins.json();
               const LoginData = userLoginData?.data
-              const userSession = LoginData.find(device => device.userId === audit.user_id && device.id === audit.sessionId);
-              const deviceDetails = userSession?.deviceInfo;
-              console.log(userSession)
+              const deviceDetails = LoginData?.data?.deviceInfo;
               audit.email = (userData?.data)?.userEmail
               audit.ip = deviceDetails?.ip
               audit.device =  deviceDetails?.device
               audit.os = deviceDetails?.os
               audit.browser = deviceDetails?.browser
-              audit.login_time = new Date(userSession.loginTime).toLocaleString('en-Gb')
-              audit.status = userSession?.isActive ? 'Active' : 'Inactive'
+              audit.login_time = new Date(LoginData?.data?.loginTime).toLocaleTimeString()
+              audit.status = LoginData?.data?.isActive ? 'Active' : 'Inactive'
               audit.user_id = (userData?.data)?.userName
             }
         }
@@ -163,7 +129,7 @@ const UserAudit = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.device}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.os}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.browser}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.login_time).toLocaleTimeString('en-US')}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.login_time}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.activity}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.status}</td>
               </tr>

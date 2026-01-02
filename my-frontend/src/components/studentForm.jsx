@@ -25,12 +25,14 @@ export default function StudentForm() {
     dispatch(initializeAuth());
   }, [dispatch]);
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
+
   const [teacher, setTeacher] = useState(null);
 
   useEffect(() => {
     const fetchTeachers = async (user) => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/teachers/email?email=' + user?.userEmail);
+        const response = await fetch(`${backend_url}/teachers/email?email=` + user?.userEmail);
         const data = await response.json();
         setTeacher(data?.data);
       } catch (error) {
@@ -112,7 +114,7 @@ export default function StudentForm() {
   // Load external CSS for react-select
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://cdn.jsdelivr.net/npm/react-select@5/dist/react-select.min.css';
+    link.href = process.env.REACT_APP_EXTERNAL_CSS;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
@@ -124,7 +126,7 @@ export default function StudentForm() {
   // Load states for selected country
   const loadStates = async (inputValue) => {
     try {
-      const response = await axios.post('https://countriesnow.space/api/v0.1/countries/states', {
+      const response = await axios.post(`${process.env.REACT_APP_STATE}`, {
         country: "India"
       });
       
@@ -146,7 +148,7 @@ export default function StudentForm() {
     if (!selectedCountry || !selectedState) return [];
     
     try {
-      const response = await axios.post('https://countriesnow.space/api/v0.1/countries/state/cities', {
+      const response = await axios.post(`${process.env.REACT_APP_CITY}`, {
         country: "India",
         state: selectedState.value
       });
@@ -174,7 +176,7 @@ export default function StudentForm() {
       if(listCities.includes(city)){
         city = 'Bangalore'
       }
-      const response = await axios.get(`https://api.postalpincode.in/postoffice/${city}`);
+      const response = await axios.get(`${process.env.REACT_APP_PINCODE + city}`);
       console.log(response);
       if (response.data[0].Status === 'Success') {
         const postOffices = response.data[0].PostOffice;
@@ -198,8 +200,8 @@ export default function StudentForm() {
     const fetchData = async () => {
       try {
         const [classesResponse, teachersResponse] = await Promise.all([
-          fetch('http://127.0.0.1:8000/classes/'),
-          fetch('http://127.0.0.1:8000/teachers/')
+          fetch(`${backend_url}/classes/`),
+          fetch(`${backend_url}/teachers/`)
         ]);
 
         if (!classesResponse.ok) throw new Error(`HTTP error! status: ${classesResponse.status}`);
@@ -238,7 +240,7 @@ export default function StudentForm() {
   const fetchStudentData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://127.0.0.1:8000/students/id?studentId=${id}`);
+      const response = await fetch(`${backend_url}/students/id?studentId=${id}`);
       if (!response.ok) throw new Error('Failed to fetch student data');
       
       const result = await response.json();
@@ -362,8 +364,8 @@ export default function StudentForm() {
     }
 
     const url = isEditMode 
-      ? `http://127.0.0.1:8000/students/id`
-      : 'http://127.0.0.1:8000/students/';
+      ? `${backend_url}/students/id`
+      : `${backend_url}/students/`;
     
     const method = isEditMode ? 'PUT' : 'POST';
     

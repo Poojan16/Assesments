@@ -20,7 +20,7 @@ async def getAll():
         allUsers = await users.getAll()
         return allUsers
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while fetching users")
 
 @router.get("/id")
 async def get_user(user_id: int):
@@ -28,7 +28,7 @@ async def get_user(user_id: int):
         user = await users.get_user(user_id)
         return user
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while fetching user")
 
 @router.post("/")
 async def create_user(user: UserBase):
@@ -37,7 +37,7 @@ async def create_user(user: UserBase):
         user_info = await users.create_user(user)
         return user_info
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while creating user")
     
 @router.put("/reset")
 async def reset(email: str = Form(...), password: str = Form(...)):
@@ -45,7 +45,7 @@ async def reset(email: str = Form(...), password: str = Form(...)):
         user_info = await users.reset(email, password)
         return user_info
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while resetting password")
 
 @router.get("/otp")
 async def send_otp(email:str):
@@ -53,7 +53,7 @@ async def send_otp(email:str):
         otp = await users.send_otp(email)
         return otp
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while sending otp")
     
 @router.get("/resetPassword")
 async def resetPassword(token:str):
@@ -61,7 +61,7 @@ async def resetPassword(token:str):
         otp = await users.resetPassword(token)
         return otp
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while resetting password")
     
 # admin will pass minutes for rest password link expiry and set it to the function
 @router.post("/expiry")
@@ -70,7 +70,7 @@ async def expiry_link(time: int):
         link = await users.expiry_link(time)
         return link
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while setting expiry link")
 
 @router.get("/link")
 async def link_check(email:str):
@@ -78,7 +78,7 @@ async def link_check(email:str):
         link = await users.link_check(email)
         return link
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while checking link")
 
 @router.get("/decodelink")
 async def decodelink(link):
@@ -86,7 +86,7 @@ async def decodelink(link):
         decode = await users.decodelink(link)
         return decode
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while decoding link")
 
 @router.post("/login")
 async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depends(get_db)):
@@ -94,7 +94,7 @@ async def login(user_data: LoginUser, request: Request, db: SessionLocal = Depen
         user_info = await users.login(user_data, request, db)
         return user_info
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while logging in")
 
 @router.get("/logout")
 async def logout(sessionId: str, db: SessionLocal = Depends(get_db)):
@@ -102,7 +102,7 @@ async def logout(sessionId: str, db: SessionLocal = Depends(get_db)):
         user_info = await users.logout(sessionId, db)
         return user_info
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while logging out")
     
 @router.get("/logins")
 async def get_user_logins(email: str):
@@ -110,4 +110,4 @@ async def get_user_logins(email: str):
         user_info = await users.get_user_logins(email)
         return user_info
     except Exception as e:
-        raise httpException(status_code=400, detail=str(e))
+        raise httpException(status_code=400, detail="Something went wrong while fetching user logins")

@@ -18,7 +18,7 @@ async def get_classes():
         allClass = await classes.get_classes()
         return allClass
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching classes")
 
 # get class by id
 @router.get("/id")
@@ -27,7 +27,7 @@ async def get_class(classId: int):
         cls = await classes.get_class(classId)
         return cls
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching class")
     
 # create a class
 @router.post("/")
@@ -36,7 +36,7 @@ async def create_class(data: ClassBase):
         cls = await classes.create_class(data)
         return cls
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating class")
 
 # update a class
 @router.put("/")
@@ -45,7 +45,7 @@ async def update_class(classId: int, data: ClassBase):
         cls = await classes.update_class(classId, data)
         return cls
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while updating class")
 
 # delete a class
 @router.delete("/")
@@ -54,4 +54,4 @@ async def delete_class(classId: int):
         cls = await classes.delete_class(classId)
         return cls
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while deleting class")

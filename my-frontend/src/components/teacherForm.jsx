@@ -35,12 +35,14 @@ export default function AddTeacherForm() {
     dispatch(initializeAuth());
   }, [dispatch]);
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
+
   const [teacher, setTeacher] = useState({});
 
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/teachers/email?email=' + user.userEmail);
+        const response = await fetch(`${backend_url}/teachers/email?email=` + user.userEmail);
         const data = await response.json();
         setTeacher(data?.data);
       } catch (error) {
@@ -106,7 +108,7 @@ export default function AddTeacherForm() {
   // Load external CSS for react-select
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://cdn.jsdelivr.net/npm/react-select@5/dist/react-select.min.css';
+    link.href = process.env.REACT_APP_EXTERNAL_CSS;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
@@ -119,8 +121,8 @@ export default function AddTeacherForm() {
     const handleRoles = async () => {
       try {
         const [rolesResponse, teacherResponse, schoolResponse] = await Promise.all([
-          fetch('http://127.0.0.1:8000/roles/'),
-          fetch('http://127.0.0.1:8000/teachers/'),
+          fetch(`${backend_url}/roles/`),
+          fetch(`${backend_url}/teachers/`),
         ]);
 
         const rolesData = await rolesResponse.json();
@@ -138,7 +140,7 @@ export default function AddTeacherForm() {
   // Load states for selected country
   const loadStates = async (inputValue) => {    
     try {
-      const response = await axios.post('https://countriesnow.space/api/v0.1/countries/states', {
+      const response = await axios.post(`${process.env.REACT_APP_STATE}`, {
         country: "India"
       });
       
@@ -158,7 +160,7 @@ export default function AddTeacherForm() {
   // Load cities for selected country and state
   const loadCities = async (inputValue) => {    
     try {
-      const response = await axios.post('https://countriesnow.space/api/v0.1/countries/state/cities', {
+      const response = await axios.post(`${process.env.REACT_APP_CITY}`, {
         country: "India",
         state: selectedState.value
       });
@@ -181,7 +183,7 @@ export default function AddTeacherForm() {
     if (!selectedCity) return [];
     
     try {
-      const response = await axios.get(`https://api.postalpincode.in/postoffice/${selectedCity.value}`);
+      const response = await axios.get(`${process.env.REACT_APP_PINCODE + selectedCity.value}`);
       if (response.data[0].Status === 'Success') {
         const postOffices = response.data[0].PostOffice;
         const uniquePincodes = [...new Set(postOffices.map(office => office.Pincode))];
@@ -264,7 +266,7 @@ export default function AddTeacherForm() {
       }
     }
     
-    const response = await fetch('http://127.0.0.1:8000/teachers/', {
+    const response = await fetch(`${backend_url}/teachers/`, {
       method: 'POST',
       body: formData
     });

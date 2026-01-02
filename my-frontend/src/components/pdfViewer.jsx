@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Document, Page } from 'react-pdf';
 import { pdfjs } from 'react-pdf';
 
-// Set up PDF.js worker source
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString();
 
-function MyPdfViewer({ pdfBlobUrl = 'blob:http://localhost:3000/2a36014a-9fc7-4c97-8152-af634e5c938a'}) {
+function MyPdfViewer({ pdfBlobUrl}) {
   const [numPages, setNumPages] = useState(null);
 
   const onDocumentLoadSuccess = ({ numPages }) => {

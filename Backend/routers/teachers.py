@@ -71,7 +71,7 @@ async def create_teacher(
             DL,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating teacher")
 
 @router.get("/")
 async def getAll():
@@ -79,14 +79,14 @@ async def getAll():
         allTeachers = await teachers.getAll()
         return allTeachers
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching teachers")
 
 @router.get("/id")
 async def getById(teacherId: int):
     try:
         return await teachers.getById(teacherId)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching teacher")
   
 @router.get("/search")  
 async def search_teacher(query: str, schoolId: int):
@@ -94,7 +94,7 @@ async def search_teacher(query: str, schoolId: int):
         query = quote(query.lower())
         return await teachers.search_teacher(query, schoolId)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while searching teacher")
 
 @router.get("/email")
 async def get_teacher_by_email(email: EmailStr):
@@ -102,7 +102,7 @@ async def get_teacher_by_email(email: EmailStr):
         teacher = await teachers.get_teacher_by_email(email)
         return teacher
     except Exception as e:    
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching teacher")
 
 
 @router.get("/class_and_subjects")
@@ -110,14 +110,14 @@ async def get_class_and_subjects(teacherId: int):
     try:
         return await teachers.get_class_and_subjects(teacherId)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching class and subjects")
 
 @router.post("/map_teacher")
 async def map_teacher(data: MapTeacher):
     try:
         return await teachers.map_teacher(data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while mapping teacher")
 
 @router.post("/provision")
 async def Provision(
@@ -126,7 +126,7 @@ async def Provision(
     try:
         return await teachers.Provision(data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while provisioning teacher")
 
 # subject teacher upload report
 @router.post("/uploadReport")
@@ -134,14 +134,14 @@ async def upload_report(comments: str = Form(...),teacherId: int = Form(...), at
     try:
         return await teachers.upload_report(comments,teacherId, attachment, studentId)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while uploading report")
 
 @router.post("/workFlow")
 async def create_workFlow(reportId : int = Form(...), status: bool = Form(...), teacherId: int = Form(...),comments: str = Form(...)):
     try:
         return await teachers.create_workFlow(reportId, status, teacherId,comments)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating workflow")
     
 @router.get("/getWorkFlow")
 async def get_workFlow_by_id(teacherId: int):
@@ -149,7 +149,7 @@ async def get_workFlow_by_id(teacherId: int):
         workflowAudits = await teachers.get_workFlow_by_id(teacherId)
         return workflowAudits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching workflow")
     
 @router.get("/getWorkFlow/ids")
 async def get_workFlow_id(reportIds: List[int] = Query(...)):
@@ -157,7 +157,7 @@ async def get_workFlow_id(reportIds: List[int] = Query(...)):
         workflowAudits = await teachers.get_workflow_id(reportIds)
         return workflowAudits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching workflow")
 
 @router.get("/getWorkflow_all")
 async def get_workflow():
@@ -165,7 +165,7 @@ async def get_workflow():
         workflowAudits = await teachers.get_workflow_report()
         return workflowAudits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching workflow")
 
 @router.get("/workflowAudit")
 async def get_workflow():
@@ -173,14 +173,14 @@ async def get_workflow():
         workflowAudits = await teachers.get_workflow()
         return workflowAudits
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching workflow")
 
 @router.post("/importExcel")
 async def add_bulk_teacherData(file: UploadFile = File(...)):
     try:
         return await teachers.add_bulk_teacherData(file)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail="Something went wrong while adding bulk teacher data") 
 
 
 @router.post("/teacherSign")
@@ -195,7 +195,7 @@ async def teacherSign(
         addSignature = await teachers.teacherSign(signature, studentId, teacherId, subjectId, score)
         return addSignature
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while adding teacher signature")
 
 @router.get("/teacherSign/")
 async def get_teacherSign():
@@ -203,4 +203,4 @@ async def get_teacherSign():
         signature = await teachers.get_teacherSign()
         return signature
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching teacher signature")

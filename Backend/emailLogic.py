@@ -25,8 +25,7 @@ class EmailConfig:
     MAX_BATCH_SIZE = 100     
     MIN_BATCH_SIZE = 10      
     
-    SMTP_RATE_LIMIT_REQUESTS_PER_MINUTE = 100  
-    SMTP_RATE_LIMIT_REQUESTS_PER_DAY = 2000    
+    SMTP_RATE_LIMIT_REQUESTS_PER_DAY = 500    
     SMTP_RATE_LIMIT_RESET_WINDOW = 86400      
     
     INITIAL_RETRY_DELAY = 30  
@@ -97,13 +96,6 @@ class RateLimitTracker:
             logging.warning("Daily SMTP rate limit reached")
             return False
         
-        one_minute_ago = current_time - 60
-        self.request_timestamps = [ts for ts in self.request_timestamps if ts > one_minute_ago]
-        
-        if len(self.request_timestamps) >= EmailConfig.SMTP_RATE_LIMIT_REQUESTS_PER_MINUTE:
-            logging.warning("Per-minute SMTP rate limit reached")
-            return False
-        
         return True
     
     def record_request(self):
@@ -112,11 +104,6 @@ class RateLimitTracker:
         self.request_timestamps.append(current_time)
         self.daily_request_count += 1
         self.consecutive_rate_limits = 0  
-    
-    def record_rate_limit_hit(self):
-        """Record when we hit a rate limit"""
-        self.last_rate_limit_hit = time.time()
-        self.consecutive_rate_limits += 1
     
     def get_backoff_delay(self) -> float:
         """Calculate exponential backoff delay"""
@@ -148,13 +135,13 @@ class EmailNotificationSystem:
                 
             logging.info(f"Notification: {notification_subject} - {notification_body}")
             
-            notification_message = MessageSchema(
-                subject=notification_subject,
-                recipients=['pujansoni.jcasp@gmail.com'],
-                body=notification_body,
-                subtype=MessageType.plain
-            )
-            await self.fm.send_message(notification_message)
+            # notification_message = MessageSchema(
+            #     subject=notification_subject,
+            #     recipients=['pujansoni.jcasp@gmail.com'],
+            #     body=notification_body,
+            #     subtype=MessageType.plain
+            # )
+            # await self.fm.send_message(notification_message)
             logging.info("Notification sent successfully")
             
         except Exception as e:

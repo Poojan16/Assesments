@@ -18,7 +18,7 @@ async def getAll():
         return roles
     except Exception as e:
         print(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching roles")
     
 
 @router.get("/id", response_model=RoleResponse)
@@ -27,7 +27,7 @@ async def getById(roleId: int):
         roleById = await role.getById(roleId)
         return roleById
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching role")
 
 
 @router.post("/", response_model=RoleResponse)
@@ -36,7 +36,7 @@ async def create_role(data: RoleBase):
         createRole = await role.create_role(data)
         return createRole
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating role")
 
 
 @router.put("/", response_model=RoleResponse)
@@ -45,7 +45,7 @@ async def update_role(roleId: int, data: RoleUpdate):
         updateRole = await role.update_role(roleId, data)
         return updateRole
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while updating role")
 
 
 @router.delete("/", response_model=RoleResponse)
@@ -54,4 +54,4 @@ async def delete_role(roleId: int):
         deleteRole = await role.delete_role(roleId)
         return deleteRole
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while deleting role")

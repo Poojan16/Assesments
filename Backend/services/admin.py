@@ -1,25 +1,83 @@
 from models import *
 from database import *
 from fastapi import HTTPException
-from fastapi import Form, File, UploadFile
-from typing import List, Union
+from fastapi import Form, File, UploadFile, Query
+from typing import List, Union, Optional
+from sqlalchemy import select
 from uploadFile import *
+import math
 from services import teachers, student
 
 async def get_schools():
     try:
         db = SessionLocal()
         schools = db.query(School).all()
+        return schools
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str('Schools not found'))
+    
+async def filtered_schools(
+    searchTerm: Optional[str] = Form(...),
+    filterCity: Optional[str] = Form(...),
+    filterState: Optional[str] = Form(...),
+    filterPincode: Optional[str] = Form(...),
+    limit: int = Query(8, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+) :
+    try:
+        db = SessionLocal()
+        start = offset
+        end = offset + limit
+        if(searchTerm == '' and filterCity == 'all' and filterState == 'all' and filterPincode == 'all'):
+            schools = await get_schools()
+            pageWiseSchools = schools[start:end]
+            total_records = len(schools)
+            total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
+            return {
+                "status_code": 200,
+                "success": True,
+                "data": pageWiseSchools,
+                "message": "Schools fetched successfully",
+                "filteredRecords": 0,
+                "pagination": {
+                    "page": offset,
+                    "page_size": limit,
+                    "total_records": total_records,
+                    "total_pages": total_pages
+                }
+            }
+        query = select(School)
+        if(searchTerm):
+            query = query.where(School.schoolName.contains(searchTerm))
+        if(filterCity != 'all'):
+            query = query.where(School.city == filterCity)
+        if(filterState != 'all'):
+            query = query.where(School.state == filterState)
+        if(filterPincode != 'all'):
+            query = query.where(School.pin == filterPincode)
+        schools = db.scalars(query).all()
+        total_records = len(schools)
+        total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
+        pageWiseSchools = schools[start:end]
         return {
             "status_code": 200,
             "success": True,
-            "data": schools,
+            "data": pageWiseSchools,
             "message": "Schools fetched successfully",
+            "filteredRecords": total_records,
+            "pagination": {
+                "page": offset,
+                "page_size": limit,
+                "total_records": total_records,
+                "total_pages": total_pages
+            }
         }
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str('Schools not found')) 
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        db.close()
+        if db:
+            db.close()
  
 async def schooolById(schoolId: int):
     try:
@@ -47,7 +105,6 @@ async def get_teachers():
 
 async def get_students():
     try:
-        db = SessionLocal()
         students = await student.get_students()
         return students
     except Exception as e:

@@ -149,17 +149,19 @@ async def send_otp(email:str):
     
 async def resetPassword(token:str):
     try:
-        decode = await decode_expiring_link_token(token)
-        print(decode)
         db = SessionLocal()
+        decode = await decode_expiring_link_token(token)
+        user_info = db.query(User).filter(User.userEmail == decode['email']).first()
+        if(user_info == None):
+            raise httpException(status_code=400, detail="User not found")
+        print(decode)
         if(decode['type'] == "reset_password"):
             subject = "Reset Password"
             body = f"Click on this link: <a href='{os.getenv('FRONTEND_URL')}/set-password/{quote(token)}'>Reset Password</a>, once you click on link a otp will generate and sent to your email address"
             try:
                 send_email_sync('pujansoni.jcasp@gmail.com', subject, body)
                 db = SessionLocal()
-                user_info = (db.query(User).filter(User.userEmail == decode['email']).first())
-                await post_user_audit(user_info.userId, "Reset Password Link Sent")
+                await post_user_audit(user_info.userId, "Reset Password Link Sent", sessionId=0)
                 return {
                     "status_code": 200,
                     "success": True,

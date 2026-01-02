@@ -42,6 +42,8 @@ const ForgotPasswordForm = () => {
     }
   })
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL
+
   // Define the validation schema using Yup
   const validationSchema = Yup.object({
     email: Yup.string()
@@ -63,7 +65,7 @@ const ForgotPasswordForm = () => {
         // Simulate API call to send reset email
         console.log('Sending password reset email for:', values.email);
         // Replace with actual API call (e.g., axios.post('/api/forgot-password', values))
-        const response =  await fetch(`http://127.0.0.1:8000/users/link?email=${values.email}`, {
+        const response =  await fetch(`${backend_url}/users/link?email=${values.email}`, {
           method: 'GET',
         })
         const data = await response.json();
@@ -73,7 +75,7 @@ const ForgotPasswordForm = () => {
         }
         if(data?.data?.token){
           console.log(data?.data?.token);
-          const resetPassword = await fetch(`http://127.0.0.1:8000/users/resetPassword?token=${data?.data?.token}`, {
+          const resetPassword = await fetch(`${backend_url}/users/resetPassword?token=${data?.data?.token}`, {
             method: 'GET',
           })
           const resetData = await resetPassword.json();

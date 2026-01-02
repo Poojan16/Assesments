@@ -25,7 +25,7 @@ async def get_students():
         students = await student.get_students()
         return students
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't load the list of students")
 
 # get student by id
 
@@ -35,7 +35,7 @@ async def get_student(studentId: int):
         studentById = await student.get_student(studentId)
         return studentById
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Couldn't load the student")
 
 # create student
 
@@ -88,7 +88,7 @@ async def create_student(
             parentAadhar,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating student")
 
 #  student update API
 
@@ -129,7 +129,7 @@ async def update_student(
             photo
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while updating student")
 
 
 @router.post("/importExcel")
@@ -137,7 +137,7 @@ async def add_bulk_studentData(data: List[StudentBase]):
     try:
         return await student.add_bulk_studentData(data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while adding bulk student data")
 
 
 #  ---------------------------------------------------
@@ -151,7 +151,7 @@ async def getAllScores():
         studentScores = await student.getAllScores()
         return studentScores
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching student scores")
 
 @router.get("/score/{studentId}")
 async def get_student_scores(studentId: int):
@@ -159,7 +159,7 @@ async def get_student_scores(studentId: int):
         studentScore = await student.get_student_scores(studentId)
         return studentScore
     except Exception as e:  
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching student scores")
 
 @router.post("/score")
 async def create_student_score(studentId: int = Form(...), subjectId: int = Form(...), score: int = Form(...)):
@@ -167,7 +167,7 @@ async def create_student_score(studentId: int = Form(...), subjectId: int = Form
         addScore = await student.create_student_score(studentId, subjectId, score)
         return addScore
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while adding student score")
 
 @router.put("/score/{id}")
 async def update_student_score(id: int, score: int = Form(...)):
@@ -175,5 +175,4 @@ async def update_student_score(id: int, score: int = Form(...)):
         updateScore = await student.update_student_score(id,score)
         return updateScore
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail="Something went wrong while updating student score")

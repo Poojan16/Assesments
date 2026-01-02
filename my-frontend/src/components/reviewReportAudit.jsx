@@ -5,42 +5,6 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; //
 import Loader from './loader';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 
-const JSONViewer = ({ data }) => (
-  <div className="bg-gray-800 p-4 rounded-lg shadow-inner overflow-x-auto">
-    <SyntaxHighlighter language="json" style={vscDarkPlus} customStyle={{ background: 'transparent', padding: 0 }}>
-      {JSON.stringify(data, null, 2)}
-    </SyntaxHighlighter>
-  </div>
-);
-
-// --- 3. Modal Component for Details ---
-const DetailsModal = ({ isOpen, onClose, oldVal, newVal }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold">Audit Details</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            &times;
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-lg font-medium mb-2 text-red-600">Old Value</h3>
-            <JSONViewer data={oldVal} />
-          </div>
-          <div>
-            <h3 className="text-lg font-medium mb-2 text-green-600">New Value</h3>
-            <JSONViewer data={newVal} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // --- 4. Main Audit Table Component ---
 const ReviewReportAudit = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,16 +29,18 @@ const ReviewReportAudit = () => {
     document.title = 'Audit Trail'; // Set the desired title here
   }, []);
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         const [workFlowResponse, teachersResponse, reportsResponse, rolesResponse] = await Promise.all
         ([
-          fetch('http://127.0.0.1:8000/teachers/workflowAudit'),
-          fetch('http://127.0.0.1:8000/teachers/'),
-          fetch('http://127.0.0.1:8000/teachers/getWorkflow_all'),
-          fetch('http://127.0.0.1:8000/roles')
+          fetch(`${backend_url}/teachers/workflowAudit`),
+          fetch(`${backend_url}/teachers/`),
+          fetch(`${backend_url}/teachers/getWorkflow_all`),
+          fetch(`${backend_url}/roles`)
         ])
 
         if (!workFlowResponse.ok) throw new Error(`HTTP error! status: ${workFlowResponse.status}`);

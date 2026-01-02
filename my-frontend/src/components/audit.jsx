@@ -28,11 +28,13 @@ const AuditTable = () => {
     document.title = 'Audit Trail'; // Set the desired title here
   }, []);
 
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://127.0.0.1:8000/audit/')
+        const response = await fetch(`${backend_url}/audit/`)
         const data = await response.json();
         if (!response.ok) { // Check for HTTP errors
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -40,7 +42,7 @@ const AuditTable = () => {
         setAudit(data?.data);
         console.log(data.changedBy)
         for (const audit of data) {
-          const teacher = await fetch(`http://127.0.0.1:8000/teachers/id?teacherId=${Number(audit.changedBy)}`);
+          const teacher = await fetch(`${backend_url}/teachers/id?teacherId=${Number(audit.changedBy)}`);
           const teacherData = await teacher.json();
           audit.changedBy = teacherData.teacherName
         }

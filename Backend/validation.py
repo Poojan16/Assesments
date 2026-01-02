@@ -235,7 +235,7 @@ class UserList(BaseModel):
 class UserResponse(BaseModel):
     status_code: int = 200
     success: bool = True
-    data: List[UserList] | UserList | None
+    data: List[UserList] | UserList = None
     message: str = "Users fetched successfully"
 
 
@@ -263,3 +263,4 @@ class ProvisionRequest(BaseModel):
     provision: Optional[str] = None
     offBoardingDate: date | None = None
     changedBy: Optional[int] = None
+

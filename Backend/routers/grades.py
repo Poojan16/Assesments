@@ -18,14 +18,14 @@ async def getAll():
         allGrades = await grades.getAll()
         return allGrades
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching grades")
 @router.get("/id")
 async def getById(gradeId: int):
     try:
         grade = await grades.getById(gradeId)
         return grade
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while fetching grade")
 
 @router.post("/")
 async def create_grade(data: GradeBase):
@@ -33,7 +33,7 @@ async def create_grade(data: GradeBase):
         grade = await grades.create_grade(data)
         return grade
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while creating grade")
 
 @router.put("/")
 async def update_grade(gradeId: int, data: GradeUpdate):
@@ -41,7 +41,7 @@ async def update_grade(gradeId: int, data: GradeUpdate):
         grade = await grades.update_grade(gradeId, data)
         return grade
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while updating grade")
     
 
 @router.delete("/")
@@ -50,4 +50,4 @@ async def delete_grade(gradeId: int):
         grade = await grades.delete_grade(gradeId)
         return grade
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong while deleting grade")

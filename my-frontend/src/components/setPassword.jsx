@@ -1,183 +1,3 @@
-// import React, { useEffect, useState } from 'react';
-// import { useNavigate, useParams } from 'react-router-dom';
-
-// onload = async () => {
-//   const token = useParams();
-//   const setPasswordRes = await fetch(`http://127.0.0.1:8000/setPassword/decodelink?link=${token}`);
-//   const setPasswordData = await setPasswordRes.json();
-//   console.log(setPasswordData);
-// };
-
-// const NewPasswordForm = () => {
-// const [password, setPassword] = useState('');
-// const [confirmPassword, setConfirmPassword] = useState('');
-// const [errors, setErrors] = useState({});
-// const [successMessage, setSuccessMessage] = useState('');
-// const [serverError, setServerError] = useState("");
-// const { id } = useParams();
-// const {token} = useParams();
-// const navigate = useNavigate();
-
-// useEffect(() => {
-//     document.title = 'Set Password'; // Set the desired title here
-//   }, []);
-
-//   const validatePassword = (pwd) => {
-//     const newErrors = {};
-//     if (pwd.length < 8) {
-//       newErrors.length = 'Password must be at least 8 characters long.';
-//     }
-//     if (!/[A-Z]/.test(pwd)) {
-//       newErrors.uppercase = 'Password must contain at least one uppercase letter.';
-//     }
-//     if (!/[a-z]/.test(pwd)) {
-//       newErrors.lowercase = 'Password must contain at least one lowercase letter.';
-//     }
-//     if (!/[0-9]/.test(pwd)) {
-//       newErrors.number = 'Password must contain at least one number.';
-//     }
-//     if (!/[!@#$%^&*()]/.test(pwd)) {
-//       newErrors.specialChar = 'Password must contain at least one special character (!@#$%^&*()).';
-//     }
-//     return newErrors;
-//   };
-
-
-
-//   const fetchTeacherdata = async (email) => {
-//     const response = await fetch(`http://127.0.0.1:8000/teachers/email?email=${email}`);
-//     const data = await response.json();
-//     console.log(data);
-//     return data;
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     const passwordValidationErrors = validatePassword(password);
-//     const newErrors = { ...passwordValidationErrors };
-
-//     if (Object.keys(passwordValidationErrors).length > 0) {
-//       setErrors(newErrors);
-//       setSuccessMessage('');
-//       return;
-//     }
-
-//     if (password !== confirmPassword) {
-//       newErrors.confirm = 'Passwords do not match.';
-//       setErrors(newErrors);
-//       setSuccessMessage('');
-//       return;
-//     }
-
-//     if(token){
-//       // const response = await fetch(`http://127.0.0.1:8000/users/reset-password/${token}`, {
-//       //   method: 
-//       // })
-//     }
-
-//     if(id){
-//       const response = await fetch(`http://localhost:3000/v1/users/update/${id}`, {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//         body: JSON.stringify({ password:password }),
-//         })
-  
-//       if (!response.ok) {
-//         const errorData = await response.json();
-//         const message = Array.isArray(errorData.message)
-//           ? errorData.message.join(', ')
-//           : errorData.message || 'Submission failed';
-//         setServerError(message);
-//         return;
-//       }
-//       setErrors({});
-//       setSuccessMessage('Password successfully updated!');
-//       // In a real application, you would send the new password to your backend here.
-//       console.log('New password set:', password);
-//       setPassword('');
-//       setConfirmPassword('');
-//       const timer = setTimeout(() => {
-//         setSuccessMessage(null);
-//         navigate("/login");
-//       }, 2000); // 10 seconds
-  
-//       return () => clearTimeout(timer);
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-//       <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-//         <button onClick={() => {
-//           navigate('/forgot-password')
-//         }}>⬅ Back</button>
-//         <h2 className="text-2xl font-bold mb-6 text-center">Set New Password</h2>
-//         <form onSubmit={handleSubmit} className="space-y-4">
-//             {serverError && (
-//             <div className="mb-4 p-2 bg-red-100 text-red-700 border border-red-300 rounded">
-//                 {serverError}
-//             </div>
-//             )}
-//           <div>
-//             <label className="block text-sm font-medium text-gray-700" htmlFor="password">
-//               New Password
-//             </label>
-//             <input
-//               type="password"
-//               id="password"
-//               className={`mt-1 block w-full px-3 py-2 border ${
-//                 errors.length || errors.uppercase || errors.lowercase || errors.number || errors.specialChar
-//                   ? 'border-red-500'
-//                   : 'border-gray-300'
-//               } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-//               value={password}
-//               onChange={(e) => {
-//                 setPassword(e.target.value);
-//                 setErrors(validatePassword(e.target.value)); // Validate on change for immediate feedback
-//               }}
-//             />
-//             {Object.values(errors).map((error, index) => (
-//               <p key={index} className="mt-1 text-sm text-red-500">
-//                 {error}
-//               </p>
-//             ))}
-//           </div>
-
-//           <div>
-//             <label className="block text-sm font-medium text-gray-700" htmlFor="confirmPassword">
-//               Confirm New Password
-//             </label>
-//             <input
-//               type="password"
-//               id="confirmPassword"
-//               className={`mt-1 block w-full px-3 py-2 border ${
-//                 errors.confirm ? 'border-red-500' : 'border-gray-300'
-//               } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-//               value={confirmPassword}
-//               onChange={(e) => setConfirmPassword(e.target.value)}
-//             />
-//             {errors.confirm && <p className="mt-1 text-sm text-red-500">{errors.confirm}</p>}
-//           </div>
-
-//           {successMessage && <p className="mt-4 text-green-600 text-center">{successMessage}</p>}
-
-//           <button
-//             type="submit"
-//             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-//           >
-//             Set Password
-//           </button>
-//         </form>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default NewPasswordForm;
-
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -197,12 +17,11 @@ const NewPasswordForm = () => {
   const token = (window.location.pathname).split('/').pop();
   console.log(token);
 
-// Rest of your component...
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     document.title = 'Set Password';
     
-    // Validate token on component mount
     const validateToken = async () => {
       if (!token) {
         setServerError("Invalid or missing reset token");
@@ -211,7 +30,7 @@ const NewPasswordForm = () => {
       }
 
       try {
-        const response = await fetch(`http://127.0.0.1:8000/users/decodelink?link=${token}`);
+        const response = await fetch(`${backend_url}/users/decodelink?link=${token}`);
         
         if (!response.ok) {
           throw new Error('Token validation failed');
@@ -290,7 +109,7 @@ const NewPasswordForm = () => {
         formData.append('email', tokenData?.data?.email);
         formData.append('password', password);
         formData.append('token', token ? token : '');
-        const response = await fetch(`http://127.0.0.1:8000/users/reset`, {
+        const response = await fetch(`${backend_url}/users/reset`, {
           method: 'PUT',
           body: formData
         });

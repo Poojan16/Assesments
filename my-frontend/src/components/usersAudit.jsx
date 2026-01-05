@@ -5,6 +5,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; //
 import Loader from './loader';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import {useSelector} from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 
 // --- 4. Main Audit Table Component ---
 const UserAudit = () => {
@@ -13,7 +14,7 @@ const UserAudit = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth);
   const backend_url = process.env.REACT_APP_BACKEND_URL;
 
@@ -102,6 +103,14 @@ const UserAudit = () => {
   return (
     (loading) ? (<Loader />) : (
       <div className="p-4">
+        <div>
+        <button
+              onClick={() => navigate(-1)}
+              className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-2"
+            >
+              ← Back 
+            </button>
+        </div>
       <h1 h1 className="text-2xl font-bold mb-4">User Audit</h1>
       <div className="overflow-x-auto shadow-md sm:rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">

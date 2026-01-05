@@ -2,17 +2,30 @@ from fastapi import  Depends, HTTPException
 from database import SessionLocal
 from database import get_db
 from models import Audit, UserAudit
+from sqlalchemy import select
+import math
 
 
-async def get_audits():
+async def get_audits(limit: int = 10, offset: int = 0):
     try:
         db = SessionLocal()
-        audits = db.query(Audit).all()
+        total_records = db.query(Audit).count()
+        query = select(Audit).limit(limit).offset(offset)
+        audits = db.scalars(query).all()
+        total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
         return {
             "status_code": 200,
             "success": True,
             "data": audits,
-            "message": "Audits fetched successfully",
+            "message": "Schools fetched successfully",
+            "filteredRecords": 0,
+            "total_records": total_records,
+            "pagination": {
+                "page": offset,
+                "page_size": limit,
+                "total_records": total_records,
+                "total_pages": total_pages
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str('Something went wrong while fetching audits'))
@@ -39,15 +52,26 @@ async def get_audit(auditId: int):
 #  -------------- USER AUDIT APIs ---------------- 
 # --------------------------------------------------------------
 
-async def get_user_audits():
+async def get_user_audits(limit: int = 10, offset: int = 0):
     try:
         db = SessionLocal()
-        user_audits = db.query(UserAudit).all()
+        total_records = db.query(UserAudit).count()
+        query = select(UserAudit).limit(limit).offset(offset)
+        user_audits = db.scalars(query).all()
+        total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
         return {
             "status_code": 200,
             "success": True,
             "data": user_audits,
             "message": "User audits fetched successfully",
+            "filteredRecords": 0,
+            "total_records": total_records,
+            "pagination": {
+                "page": offset,
+                "page_size": limit,
+                "total_records": total_records,
+                "total_pages": total_pages
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str('Something went wrong while fetching user audits'))

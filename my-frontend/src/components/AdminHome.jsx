@@ -115,6 +115,7 @@ const AdminDashboard2 = () => {
   }, []);
 
   const [schoolPagination, setSchoolPagination] = useState({})
+  const [total_schools, setTotal_schools] = useState(0)
 
   useEffect(() => {
     const fetchFilteredSchools = async () => {
@@ -134,6 +135,7 @@ const AdminDashboard2 = () => {
         const data = await response.json();
         const schoolData = data?.data || [];
         const paginatedData = data?.pagination || {};
+        setTotal_schools(data?.totalSchools ||0)
 
 
         const AvgScoreSchoolWise = schoolData.map(school => {
@@ -1262,7 +1264,7 @@ const AdminDashboard2 = () => {
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Qualification</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Role</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Status</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Action</th>
+                          {/* <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Action</th> */}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
@@ -1278,14 +1280,14 @@ const AdminDashboard2 = () => {
                                 {teacher.active === true ? 'Active' : 'Inactive'}
                               </span>
                             </td>
-                            <td className="px-4 py-3">
+                            {/* <td className="px-4 py-3">
                               <button
                                 onClick={() => handleDiscontinue('Teacher', teacher)}
                                 className="text-red-600 hover:text-red-700 text-sm font-medium"
                               >
                                 Discontinue
                               </button>
-                            </td>
+                            </td> */}
                           </tr>
                         ))}
                       </tbody>
@@ -1346,7 +1348,7 @@ const AdminDashboard2 = () => {
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Gender</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Class</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Status</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Action</th>
+                          {/* <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Action</th> */}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
@@ -1362,14 +1364,14 @@ const AdminDashboard2 = () => {
                                 {student.active === true ? 'Active' : 'Inactive'}
                               </span>
                             </td>
-                            <td className="px-4 py-3">
+                            {/* <td className="px-4 py-3">
                               <button
                                 onClick={() => handleDiscontinue('Student', student)}
                                 className="text-red-600 hover:text-red-700 text-sm font-medium"
                               >
                                 Discontinue
                               </button>
-                            </td>
+                            </td> */}
                           </tr>
                         ))}
                       </tbody>
@@ -1457,7 +1459,7 @@ const AdminDashboard2 = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs md:text-sm text-blue-600 font-medium">Total Schools</p>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-800 mt-1">{schools.length}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-blue-800 mt-1">{total_schools}</p>
                   <p className="text-xs text-blue-600 mt-1">Across all regions</p>
                 </div>
                 <div className="bg-blue-100 p-2 md:p-3 rounded-lg">
@@ -1607,9 +1609,29 @@ const AdminDashboard2 = () => {
                   </div> */}
 
                   <div>
+                    <label className="text-sm font-medium text-slate-700 mb-2 block">State</label>
+                    <select
+                      value={filterState}
+                      onChange={(e) => {
+                        setFilterState(e.target.value);
+                        setFilterCity('all');
+                        setFilterPincode('all');
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All States</option>
+                      {[...new Set(schools.map(school => school.state))].map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="text-sm font-medium text-slate-700 mb-2 block">City</label>
                     <select
                       value={filterCity}
+                      disabled={filterState === 'all'}
                       onChange={(e) => {
                         setFilterCity(e.target.value);
                         setCurrentPage(1);
@@ -1624,26 +1646,10 @@ const AdminDashboard2 = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">State</label>
-                    <select
-                      value={filterState}
-                      onChange={(e) => {
-                        setFilterState(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All States</option>
-                      {[...new Set(schools.map(school => school.state))].map(state => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="text-sm font-medium text-slate-700 mb-2 block">Pincode</label>
                     <select
                       value={filterPincode}
+                      disabled={filterCity === 'all'}
                       onChange={(e) => {
                         setFilterPincode(e.target.value);
                         setCurrentPage(1);
@@ -1867,6 +1873,8 @@ const AdminDashboard2 = () => {
             )}
           </div>
 
+          
+
           {importModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
@@ -1959,5 +1967,6 @@ const AdminDashboard2 = () => {
     )
   );
 };
+
 
 export default AdminDashboard2;

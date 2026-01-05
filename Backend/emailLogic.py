@@ -453,11 +453,12 @@ async def send_email_endpoint(email_schema: EmailSchema1, background_tasks: Back
             print(f"Email sent to {len(message.recipients)} recipients")
         except Exception as e:
             print(f"Email sending failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
             
     fm = FastMail(conf)
     message = MessageSchema(
         subject=email_schema.subject,
-        recipients=email_schema.email[5:10],
+        recipients=email_schema.emails,
         body=email_schema.body,
         subtype=MessageType.html
     )
@@ -506,12 +507,18 @@ async def final_report_mail(background_tasks: BackgroundTasks, file:UploadFile =
         raise HTTPException(status_code=500, detail=str(e))
 
 async def send_otp_mail(email_schema: EmailSchema1, background_tasks: BackgroundTasks):
-    fm = FastMail(conf)
-    message = MessageSchema(
-        subject=email_schema.subject,
-        recipients=email_schema.email,
-        body=email_schema.body,
-        subtype=MessageType.plain
-    )
-    background_tasks.add_task(fm.send_message, message)
-    return {"message": "Email sending initiated in background."}
+    try:
+        fm = FastMail(conf)
+        message = MessageSchema(
+            subject=email_schema.subject,
+            recipients=email_schema.emails,
+            body=email_schema.body,
+            subtype=MessageType.html
+        )
+        try:
+            await fm.send_message(message)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        return {"message": "Email sending initiated in background."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

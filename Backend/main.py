@@ -24,27 +24,21 @@ import random
 from redis_client import redis_client,get_reset_token       
 import logging
 from services.paymentConfig import *
+import pika
 import json
+from rabbitMQ import Consumer
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # RabbitMQ Connection establishment
+    # check_rabbitmq_connection()
+    
     scheduler = AsyncIOScheduler()
-    # scheduler.add_job(
-    #     schedule_annual_notifications,
-    #     IntervalTrigger(seconds=30),  
-    #     id="hourly_notification_check",
-    #     replace_existing=True
-    # )
-    central_email_service = CentralEmailService(SessionLocal(), EmailNotificationSystem(SessionLocal()))
-    # scheduler.add_job(
-    #     central_email_service.central_email_system,
-    #     IntervalTrigger(minutes=1),  
-    #     id="hourly_email_check",
-    #     replace_existing=True
-    # )
+    # scheduler.add_job(func=schedule_annual_notifications, trigger="interval", seconds=20)
+    # scheduler.add_job(func=Consumer, trigger="interval", seconds=10)
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -59,6 +53,21 @@ app = FastAPI(
     version="1.0.0",
 )
 
+def publish_message(message: str):
+    # Connect to RabbitMQ using the service name defined in docker-compose
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq', port=5672))
+    channel = connection.channel()
+    channel.queue_declare(queue='fastapi_queue')
+    channel.basic_publish(exchange='', routing_key='fastapi_queue', body=message.encode())
+    connection.close()
+
+@app.post("/send")
+def send_message_to_rabbitmq(message: dict):
+    try:
+        publish_message(json.dumps(message))
+        return {"status": "Message sent to RabbitMQ", "message_body": message}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
         
 @app.on_event("shutdown")
@@ -347,5 +356,20 @@ async def sessions(sessionId:str):
             },
             "message": "Sessions fetched successfully",
         }
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
+    
+# set cron job for scheduling the task again and again
+# @app.get("/consumer")
+# async def consumer():
+#     try:
+#         await Consumer()
+#     except Exception as e:
+#         raise httpException(status_code=400, detail=str(e))
+ 
+@app.post("/mail")   
+async def mail(email_schema: EmailSchema1, background_tasks: BackgroundTasks):
+    try:
+        await send_otp_mail(email_schema, background_tasks)
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))

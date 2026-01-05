@@ -4,6 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; // VS Code dark theme
 import Loader from './loader';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 // --- 4. Main Audit Table Component ---
 const ReviewReportAudit = () => {
@@ -15,6 +16,7 @@ const ReviewReportAudit = () => {
   const [teachers, setTeachers] = useState([]);
   const [reports, setReports] = useState([]);
   const [roles, setRoles] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Simulate a loading process (e.g., data fetching, component mounting)
@@ -98,6 +100,14 @@ const ReviewReportAudit = () => {
   return (
     (loading) ? (<Loader />) : (
       <div className="p-4">
+        <div>
+        <button
+              onClick={() => navigate(-1)}
+              className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-2"
+            >
+              ← Back 
+            </button>
+        </div>
       <h1 h1 className="text-2xl font-bold mb-4">Work-Flow Audit</h1>
       <div className="overflow-x-auto shadow-md sm:rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">

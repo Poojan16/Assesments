@@ -44,7 +44,7 @@ async def get_schools(
         )
         return schools
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Couldn't load the list of schools")
+        raise HTTPException(status_code=500, detail="Couldn't load the list of schools : " + str(e))
  
 @router.get("/schools/{schoolId}")       
 async def get_school(schoolId: int):

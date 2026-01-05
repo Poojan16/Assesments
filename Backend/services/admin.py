@@ -26,19 +26,20 @@ async def filtered_schools(
 ) :
     try:
         db = SessionLocal()
-        start = offset
-        end = offset + limit
+        total_records = db.query(School).count()
         if(searchTerm == '' and filterCity == 'all' and filterState == 'all' and filterPincode == 'all'):
-            schools = await get_schools()
-            pageWiseSchools = schools[start:end]
-            total_records = len(schools)
+            # with limit and offset
+            query = select(School).limit(limit).offset(offset)
+            schools = db.scalars(query).all()
+            print(schools)
             total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
             return {
                 "status_code": 200,
                 "success": True,
-                "data": pageWiseSchools,
+                "data": schools,
                 "message": "Schools fetched successfully",
                 "filteredRecords": 0,
+                "totalSchools": total_records,
                 "pagination": {
                     "page": offset,
                     "page_size": limit,
@@ -55,15 +56,16 @@ async def filtered_schools(
             query = query.where(School.state == filterState)
         if(filterPincode != 'all'):
             query = query.where(School.pin == filterPincode)
-        schools = db.scalars(query).all()
-        total_records = len(schools)
+        schools = query.limit(limit).offset(offset)
         total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
-        pageWiseSchools = schools[start:end]
+        pageWiseSchools = db.scalars(query).all()
+        total_records = len(pageWiseSchools)
         return {
             "status_code": 200,
             "success": True,
             "data": pageWiseSchools,
             "message": "Schools fetched successfully",
+            "totalSchools": total_records,
             "filteredRecords": total_records,
             "pagination": {
                 "page": offset,

@@ -13,7 +13,11 @@ const AuditTable = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [recordsPerPage, setRecordsPerPage] = useState(10);
   const navigate = useNavigate();
+  const [paginatedData, setPaginatedData] = useState([]);
+  const [total_records, setTotalRecords] = useState(0);
 
   useEffect(() => {
     // Simulate a loading process (e.g., data fetching, component mounting)
@@ -34,12 +38,14 @@ const AuditTable = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${backend_url}/audit/`)
+        const response = await fetch(`${backend_url}/audit/?limit=${recordsPerPage}&offset=${offset}`);
         const data = await response.json();
         if (!response.ok) { // Check for HTTP errors
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         setAudit(data?.data);
+        setPaginatedData(data?.pagination);
+        setTotalRecords(paginatedData?.total_records);
         console.log(data.changedBy)
         for (const audit of data) {
           const teacher = await fetch(`${backend_url}/teachers/id?teacherId=${Number(audit.changedBy)}`);
@@ -53,20 +59,19 @@ const AuditTable = () => {
       }
     }
     fetchData()
-    }, []);
+    }, [recordsPerPage, offset,backend_url]);
 
     const auditLogs = audit;
 
   //Pagination
-  const recordsPerPage = 10;
-  const totalPages = Math.ceil(auditLogs.length / recordsPerPage);
+  const totalPages = paginatedData?.total_pages;
   
   console.log(auditLogs)
 
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * recordsPerPage;
-    return auditLogs.slice(startIndex, startIndex + recordsPerPage);
-  }, [currentPage,auditLogs]);
+  // const paginatedLogs = useMemo(() => {
+  //   const startIndex = (currentPage - 1) * recordsPerPage;
+  //   return auditLogs.slice(startIndex, startIndex + recordsPerPage);
+  // }, [currentPage,auditLogs]);
 
   const openModal = (log) => {
     setSelectedLog(log);
@@ -81,12 +86,21 @@ const AuditTable = () => {
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+      setOffset((page - 1) * recordsPerPage);
     }
   };
 
   return (
     (loading) ? (<Loader />) : (
       <div className="p-4">
+        <div>
+        <button
+              onClick={() => navigate(-1)}
+              className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-2"
+            >
+              ← Back to Dashboard
+            </button>
+        </div>
       <div className='flex justify-between'>
         <h1 h1 className="text-2xl font-bold mb-4">Audit Trail</h1>
         <div className='flex gap-2'>
@@ -109,7 +123,7 @@ const AuditTable = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {(loading) ? <ThreeDots height="50" width="50" radius="9" color="#4fa94d"  /> : paginatedLogs.map((log) => (
+            {(loading) ? <ThreeDots height="50" width="50" radius="9" color="#4fa94d"  /> : audit.map((log) => (
               <tr key={log.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleDateString('en-Gb')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.tableName}</td>

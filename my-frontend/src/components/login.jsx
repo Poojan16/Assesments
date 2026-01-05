@@ -18,7 +18,7 @@ const LoginPage = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(true)
   const [Data, setData] = useState({});
-  
+  console.log(Data)
   const { 
       register, 
       handleSubmit, 
@@ -110,7 +110,8 @@ const LoginPage = () => {
         }, 5000); // 10 seconds
 
         return () => clearTimeout(timer);
-      } 
+      }
+      Data = {} 
     }else{
       setServerError("Login failed: Bot validation failed.");
       const timer = setTimeout(() => {
@@ -132,10 +133,10 @@ const LoginPage = () => {
   }
 
   useEffect(()=>{
-    if(Data){
+    if(Data?.statusCode === 200){
       handleFormData(Data)
     }
-  },[])
+  },[Data])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

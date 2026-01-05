@@ -11,9 +11,9 @@ router = APIRouter(
 )
 
 @router.get("/")
-async def get_audits():
+async def get_audits(limit: int = 10, offset: int = 0):
     try:
-        audits = await audit.get_audits()
+        audits = await audit.get_audits(limit, offset)
         return audits
     except Exception as e:
         raise HTTPException(status_code=500, detail="Something went wrong while fetching audits")

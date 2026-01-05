@@ -6,7 +6,7 @@ import time
 import uuid
 from typing import List, Optional, Dict, Any, Tuple
 from contextlib import asynccontextmanager
-
+from rabbitMQ import Producer
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -374,18 +374,12 @@ async def schedule_annual_notifications():
                             
                             body = generate_email_body(result, n_type)
                             
-                            email_schema = EmailRequest(
+                            email_schema = EmailSchema1(
+                                subject="Payment Reminder",
                                 emails=['pujansoni.jcasp@gmail.com'],
-                                subject='Fees Reminder',
-                                body=body,
-                                priority=EmailPriority.NORMAL,
-                                attachment=None,
-                                metadatas=None,
-                                max_retries=3,
-                                retry_interval=300
-                            )   
-                            
-                            await send_email_with_retry(email_schema, BackgroundTasks(), modify_by=None)                       
+                                body=body
+                            )
+                            await Producer(email_schema)
                             
                             logger.info(f"Scheduled task {n_type} completed successfully")
                             

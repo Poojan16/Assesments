@@ -176,3 +176,11 @@ async def update_student_score(id: int, score: int = Form(...)):
         return updateScore
     except Exception as e:
         raise HTTPException(status_code=500, detail="Something went wrong while updating student score")
+    
+@router.get("/parents")
+async def get_parents():
+    try:
+        parents = await student.get_parents()
+        return parents
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Couldn't load the list of parents")

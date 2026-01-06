@@ -20,15 +20,6 @@ const AuditTable = () => {
   const [total_records, setTotalRecords] = useState(0);
 
   useEffect(() => {
-    // Simulate a loading process (e.g., data fetching, component mounting)
-    const timer = setTimeout(() => {
-      setLoading(false); // Hide loader after a delay
-    }, 1000); // Adjust delay as needed
-
-    return () => clearTimeout(timer); // Cleanup timer on unmount
-  }, []);
-
-  useEffect(() => {
     document.title = 'Audit Trail'; // Set the desired title here
   }, []);
 
@@ -38,20 +29,22 @@ const AuditTable = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${backend_url}/audit/?limit=${recordsPerPage}&offset=${offset}`);
-        const data = await response.json();
-        if (!response.ok) { // Check for HTTP errors
-          throw new Error(`HTTP error! status: ${response.status}`);
+        const [auditRes, teacherResponse] = await Promise.all([
+          fetch(`${backend_url}/audit/?limit=${recordsPerPage}&offset=${offset}`),
+          fetch(`${backend_url}/teachers/`),
+        ]);
+        const data = await auditRes.json();
+        const teacherData = await teacherResponse.json();
+
+        if(!auditRes.ok || !teacherResponse.ok) {
+          return;
+        }
+        for (const audit of data?.data) {
+          audit.changedBy = teacherData?.data?.find((teacher) => teacher.teacherId === audit.changedBy)?.teacherName;
         }
         setAudit(data?.data);
         setPaginatedData(data?.pagination);
         setTotalRecords(paginatedData?.total_records);
-        console.log(data.changedBy)
-        for (const audit of data) {
-          const teacher = await fetch(`${backend_url}/teachers/id?teacherId=${Number(audit.changedBy)}`);
-          const teacherData = await teacher.json();
-          audit.changedBy = teacherData.teacherName
-        }
       } catch (error) {
         console.error('Failed to fetch dropdowns', error);
       } finally {
@@ -125,12 +118,12 @@ const AuditTable = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {(loading) ? <ThreeDots height="50" width="50" radius="9" color="#4fa94d"  /> : audit.map((log) => (
               <tr key={log.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleDateString('en-Gb')}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.DModify).toLocaleDateString('en-Gb')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.tableName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.fieldId}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.fieldName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(log.oldValue) === '1' ? 'Active' : 'Inactive'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(log.newValue) === '1' ? 'Active' : 'Inactive'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.fieldName === 'offBoardingDate' ? log.oldValue != 'N/A' ? new Date(log.oldValue).toLocaleDateString('en-Gb') : log.oldValue : log.oldValue}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.fieldName === 'offBoardingDate' ? new Date(log.newValue).toLocaleDateString('en-Gb') : log.newValue}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.reason}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.changedBy}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -164,7 +157,7 @@ const AuditTable = () => {
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * recordsPerPage + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(currentPage * recordsPerPage, auditLogs.length)}
+                {(  (currentPage - 1) * recordsPerPage ) + auditLogs.length}
               </span>{' '}
               of <span className="font-medium">{auditLogs.length}</span> results
             </p>

@@ -34,7 +34,7 @@ const LoginPage = () => {
     const backend_url = process.env.REACT_APP_BACKEND_URL;
 
   const onSubmit = async (data) => {
-  
+    setLoading(true)
         try {
           const url = `${backend_url}/users/login`;
           const method = "POST";
@@ -78,6 +78,9 @@ const LoginPage = () => {
           }
         } catch (error) {
           console.error("Login failed:", error);
+        }
+        finally{
+          setLoading(false)
         }
       
     

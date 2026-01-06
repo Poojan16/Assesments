@@ -22,23 +22,21 @@ async def get_schools():
         schools = await admin.get_schools()
         return schools
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Couldn't load the list of schools")
+        raise HTTPException(status_code=500, detail="Couldn't load the list of schools : " + str(e))
 
 @router.post("/filterSchools")
 async def get_schools(
     searchTerm: Optional[str] = Form(...),
-    filterCity: Optional[str] = Form(...),
     filterState: Optional[str] = Form(...),
-    filterPincode: Optional[str] = Form(...),
+    filterBoard: Optional[str] = Form(...),
     limit: int = Query(8, ge=1, le=100),
     offset: int = Query(0, ge=0)
 ):
     try:
         schools = await admin.filtered_schools(
             searchTerm,
-            filterCity,
             filterState,
-            filterPincode,
+            filterBoard,
             limit,
             offset
         )

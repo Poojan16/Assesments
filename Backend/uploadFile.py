@@ -7,6 +7,7 @@ import io
 import tempfile
 from dotenv import load_dotenv
 import logging
+import requests
 load_dotenv()
 
 
@@ -70,8 +71,41 @@ async def decrypt_file(filepath: str) -> bytes:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Decryption error: {str(e)}")
 
-
-
+async def FileScan(file: UploadFile = File(...)):
+    try:
+        url = os.getenv("VIRUSTOTAL_URL")
+        apikey = os.getenv("VIRUSTOTAL_APIKEY")
+        
+        with tempfile.NamedTemporaryFile() as temp_file:
+            temp_file.write(await file.read())
+            temp_file.flush()
+            files = {'file': open(temp_file.name, 'rb')}
+            headers = {'x-apikey': apikey}
+            try:
+                filesRes = requests.post(url, files=files, headers=headers)
+                filesResult = filesRes.json()
+                dataId = filesResult['data']['id']
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"File scan error: {str(e)}")
+            
+            url = f"{os.getenv('VIRUSTOTAL_ANALYSES_URL')}{dataId}"
+            headers = {'x-apikey': apikey}
+            try:
+                analysesRes = requests.get(url, headers=headers)
+                analysesResult = analysesRes.json()
+                status = analysesResult['data']['attributes']['status']
+                malicious = analysesResult['data']['attributes']['stats']['malicious']
+                suspicious = analysesResult['data']['attributes']['stats']['suspicious']
+                harmless = analysesResult['data']['attributes']['stats']['harmless']
+                if status == 'completed' and malicious == 0 and suspicious == 0 and harmless == 0:
+                    return True
+                else:
+                    return {"status": status, "malicious": malicious, "suspicious": suspicious, "harmless": harmless}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"File scan error: {str(e)}")
+        
+    except Exception as e:
+        raise HTTPException(stacompletedtus_code=500, detail=f"File read error: {str(e)}")
 
 
 

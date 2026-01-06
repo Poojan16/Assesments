@@ -16,10 +16,11 @@ from models import *
 from datetime import *
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Union
-from uploadFile import decrypt_file, upload_and_encrypt_file
+from uploadFile import decrypt_file, upload_and_encrypt_file, FileScan
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 import random
 from redis_client import redis_client,get_reset_token       
 import logging
@@ -27,6 +28,7 @@ from services.paymentConfig import *
 import pika
 import json
 from rabbitMQ import Consumer
+from logger import *
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,12 @@ async def lifespan(app: FastAPI):
     # check_rabbitmq_connection()
     
     scheduler = AsyncIOScheduler()
-    # scheduler.add_job(func=schedule_annual_notifications, trigger="interval", seconds=20)
+    scheduler.add_job(
+        schedule_annual_notifications,
+        CronTrigger(hour=0, minute=0, day="*/2"), 
+        id="every_two_day_task",
+        replace_existing=True
+    )
     # scheduler.add_job(func=Consumer, trigger="interval", seconds=10)
     scheduler.start()
     yield
@@ -371,5 +378,26 @@ async def sessions(sessionId:str):
 async def mail(email_schema: EmailSchema1, background_tasks: BackgroundTasks):
     try:
         await send_otp_mail(email_schema, background_tasks)
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
+  
+@app.post("/fileScan")  
+async def fileScan(file: UploadFile = File(...)):
+    try:
+        return await FileScan(file)
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
+    
+@app.get("/logger")
+async def get_log(limit: int = 10, offset: int = 0):
+    try:
+        return await get_logger(limit, offset)
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
+
+@app.post("/logger")
+async def add_logger(logger: LoggerBase):
+    try:
+        return await add_log(logger)
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))

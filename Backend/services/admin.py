@@ -18,28 +18,35 @@ async def get_schools():
     
 async def filtered_schools(
     searchTerm: Optional[str] = Form(...),
-    filterCity: Optional[str] = Form(...),
     filterState: Optional[str] = Form(...),
-    filterPincode: Optional[str] = Form(...),
+    filterBoard: Optional[str] = Form(...),
     limit: int = Query(8, ge=1, le=100),
     offset: int = Query(0, ge=0)
-) :
+):
     try:
         db = SessionLocal()
+        
+        # Get all distinct states
+        states = db.query(School.state).distinct().all()
+        states = [state[0] for state in states if state[0]]
+        
+        boards = db.query(School.board).distinct().all()
+        boards = [board[0] for board in boards if board[0]]
+        
         total_records = db.query(School).count()
-        if(searchTerm == '' and filterCity == 'all' and filterState == 'all' and filterPincode == 'all'):
-            # with limit and offset
+        
+        if(searchTerm == ''  and filterState == 'all' and filterBoard == 'all'):
             query = select(School).limit(limit).offset(offset)
             schools = db.scalars(query).all()
-            print(schools)
             total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
             return {
                 "status_code": 200,
                 "success": True,
                 "data": schools,
+                "states": states,
+                "boards": boards,
                 "message": "Schools fetched successfully",
                 "filteredRecords": 0,
-                "totalSchools": total_records,
                 "pagination": {
                     "page": offset,
                     "page_size": limit,
@@ -47,26 +54,30 @@ async def filtered_schools(
                     "total_pages": total_pages
                 }
             }
+        
         query = select(School)
         if(searchTerm):
             query = query.where(School.schoolName.contains(searchTerm))
-        if(filterCity != 'all'):
-            query = query.where(School.city == filterCity)
         if(filterState != 'all'):
             query = query.where(School.state == filterState)
-        if(filterPincode != 'all'):
-            query = query.where(School.pin == filterPincode)
+        if(filterBoard != 'all'):
+            query = query.where(School.board == filterBoard)
+                
         schools = query.limit(limit).offset(offset)
-        total_pages = math.ceil(total_records / limit) if total_records > 0 else 0
-        pageWiseSchools = db.scalars(query).all()
-        total_records = len(pageWiseSchools)
+        pageWiseSchools = db.scalars(schools).all()
+        
+        total_filtered_records = len(pageWiseSchools)
+        
+        total_pages = math.ceil(total_filtered_records / limit) if total_filtered_records > 0 else 0
+        
         return {
             "status_code": 200,
             "success": True,
             "data": pageWiseSchools,
+            "states": states,
+            "boards": boards,
             "message": "Schools fetched successfully",
-            "totalSchools": total_records,
-            "filteredRecords": total_records,
+            "filteredRecords": total_filtered_records,
             "pagination": {
                 "page": offset,
                 "page_size": limit,

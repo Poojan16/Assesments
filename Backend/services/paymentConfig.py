@@ -341,12 +341,12 @@ async def schedule_annual_notifications():
             fee_due_date = datetime(current_date.year + 1, 7, 7)
         
         notification_schedule = [
-            # ("10_days_before", fee_due_date - timedelta(days=10), dt_time(9, 0)),  
-            # ("5_days_before", fee_due_date - timedelta(days=5), dt_time(10, 0)),   
-            # ("3_days_before", fee_due_date - timedelta(days=3), dt_time(11, 0)),   
-            # ("due_date_morning", fee_due_date, dt_time(9, 0)),                     
-            # ("due_date_noon", fee_due_date, dt_time(13, 0)),
-            ("in_1_minute", datetime.now(), dt_time(datetime.now().hour, datetime.now().minute + 1))                       
+            ("10_days_before", fee_due_date - timedelta(days=10), dt_time(9, 0)),  
+            ("5_days_before", fee_due_date - timedelta(days=5), dt_time(10, 0)),   
+            ("3_days_before", fee_due_date - timedelta(days=3), dt_time(11, 0)),   
+            ("due_date_morning", fee_due_date, dt_time(9, 0)),                     
+            ("due_date_noon", fee_due_date, dt_time(13, 0)),
+            # ("in_1_minute", datetime.now(), dt_time(datetime.now().hour, datetime.now().minute + 1))                       
         ]
         
         for notification_type, date_obj, time_obj in notification_schedule:
@@ -382,6 +382,15 @@ async def schedule_annual_notifications():
                             await Producer(email_schema)
                             
                             logger.info(f"Scheduled task {n_type} completed successfully")
+                            
+                            scheduler.add_job(
+                                send_scheduled_emails,
+                                trigger=DateTrigger(run_date=scheduled_datetime),
+                                id=f"batch-email-{n_type}-{date_obj.strftime('%Y%m%d')}",
+                                replace_existing=True,
+                                misfire_grace_time=300,  
+                                coalesce=True
+                            )
                             
                         except Exception as e:
                             logger.error(f"Error in scheduled task {n_type}: {e}")

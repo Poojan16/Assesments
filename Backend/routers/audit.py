@@ -32,9 +32,9 @@ async def get_audit(auditId: int):
 # --------------------------------------------------------------
 
 @router.get("/user_audits")
-async def get_user_audits():
+async def get_user_audits(limit: int = 10, offset: int = 0):
     try:
-        user_audits = await audit.get_user_audits()
+        user_audits = await audit.get_user_audits(limit, offset)
         return user_audits
     except Exception as e:
         raise HTTPException(status_code=500, detail="Something went wrong while fetching user audits")

@@ -22,7 +22,7 @@ const AdminDashboard2 = () => {
   const [itemsPerPage, setItemsPerPage] = useState(8);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterBoard, setFilterBoard] = useState('all');
   const [filterPerformance, setFilterPerformance] = useState('all');
   const [filterCity, setFilterCity] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -51,6 +51,10 @@ const AdminDashboard2 = () => {
   const [analyticsTab, setAnalyticsTab] = useState('overall'); // 'overall', 'classwise', 'subjectwise'
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedSubject, setSelectedSubject] = useState('all');
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [pincodes, setPincodes] = useState([]);
+  const [parents, setParents] = useState([]);
 
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -72,7 +76,8 @@ const AdminDashboard2 = () => {
           fetch(`${backend_url}/classes/`),
           fetch(`${backend_url}/grades/`),
           fetch(`${backend_url}/subjects/`),
-          fetch(`${backend_url}/students/score`)
+          fetch(`${backend_url}/students/score`),
+          fetch(`${backend_url}/students/parents`)
         ]);
 
         responses.forEach(res => {
@@ -86,24 +91,34 @@ const AdminDashboard2 = () => {
           classRes,
           gradeRes,
           subjectRes,
-          scoreRes
+          scoreRes,
+          parentRes
         ] = await Promise.all(responses.map(r => r.json()));
 
         const teachers = teacherRes.data || [];
         const students = studentRes.data || [];
-        const roles = roleRes.data || [];
+        const rolesData = roleRes.data || [];
         const classes = classRes.data || [];
         const grades = gradeRes.data || [];
         const subjects = subjectRes.data || [];
         const scores = scoreRes.data || [];
+        const parents = parentRes.data || [];
+
 
         setAllTeachers(teachers);
         setAllStudents(students);
-        setRoles(roles);
         setClasses(classes);
         setGrades(grades);
         setSubjects(subjects);
         setScores(scores);
+        setParents(parents);
+        const updatedroles = rolesData.map((role, roleId) => {
+          return {
+            ...role,
+            roleId: roleId+1
+          }
+        })
+        setRoles(updatedroles);
       } catch (error) {
         setError(error);
       } finally {
@@ -112,19 +127,27 @@ const AdminDashboard2 = () => {
     };
 
     generateData();
-  }, []);
+  }, [backend_url]);
+
+  console.log(roles);
+
+
 
   const [schoolPagination, setSchoolPagination] = useState({})
   const [total_schools, setTotal_schools] = useState(0)
 
-  useEffect(() => {
+  // Add new state variables for filter options
+const [statesList, setStatesList] = useState([]);
+const [boardsList, setBoardsList] = useState([]);
+
+// Update your useEffect to use the backend data
+useEffect(() => {
     const fetchFilteredSchools = async () => {
       try {
         const formData = new FormData();
         formData.append('searchTerm', searchTerm);
-        formData.append('filterCity', filterCity);
         formData.append('filterState', filterState);
-        formData.append('filterPincode', filterPincode);
+        formData.append('filterBoard', filterBoard);
         const offset = (currentPage-1) * itemsPerPage;
         const response = await fetch(`${backend_url}/admin/filterSchools?limit=${itemsPerPage}&offset=${offset}`,{
           method: 'POST',
@@ -135,9 +158,14 @@ const AdminDashboard2 = () => {
         const data = await response.json();
         const schoolData = data?.data || [];
         const paginatedData = data?.pagination || {};
-        setTotal_schools(data?.totalSchools ||0)
+        
+        // Set filter options from backend response
+        setStatesList(data?.states || []);
+        setBoardsList(data?.boards || []);
+        
+        setTotal_schools(paginatedData?.total_records || 0);
 
-
+        // ... rest of your calculation logic
         const AvgScoreSchoolWise = schoolData.map(school => {
           const schoolStudents = allStudents.filter(
             student => student.schoolId === school.schoolId
@@ -171,7 +199,6 @@ const AdminDashboard2 = () => {
           };
         });
 
-        console.log(AvgScoreSchoolWise);
         setSchools(AvgScoreSchoolWise);
         setSchoolPagination(paginatedData);
       } catch (error) {
@@ -180,8 +207,30 @@ const AdminDashboard2 = () => {
     }
 
     fetchFilteredSchools();
-  },[filterCity, filterPerformance, filterPincode, filterState, filterStatus, searchTerm, currentPage]);
+  },[filterCity, filterPerformance, filterPincode, filterBoard, filterState, searchTerm, currentPage]);
 
+  console.log(statesList);
+  function loadCities(state) {
+      try {
+          return schools
+              .filter((school) => school.state === state)
+              .map((school) => school.city);
+      } catch (error) {
+          console.error('Error loading cities:', error);
+          return [];
+      }
+  }
+
+  function loadPincodes(city) {
+      try {
+          return schools
+              .filter((school) => school.city === city)
+              .map((school) => school.pin);
+      } catch (error) {
+          console.error('Error loading pincodes:', error);
+          return [];
+      }
+  }
   console.log(schools);
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -317,7 +366,7 @@ const AdminDashboard2 = () => {
     });
 
     return filtered;
-  }, [schools, searchTerm, sortBy, sortOrder, filterStatus, filterPerformance, filterCity, filterState, filterPincode]);
+  }, [schools, searchTerm, sortBy, sortOrder, filterBoard, filterCity, filterState, filterPincode]);
 
   // Pagination
   const totalPages = schoolPagination.total_pages;
@@ -902,8 +951,7 @@ const AdminDashboard2 = () => {
 
     // Filter and paginate teachers
     let filteredTeachers = allTeachers.filter(t =>
-      t.teacherName.toLowerCase().includes(teacherSearch.toLowerCase()) ||
-      t.subject.toLowerCase().includes(teacherSearch.toLowerCase())
+      t.teacherName.toLowerCase().includes(teacherSearch.toLowerCase())
     );
     filteredTeachers = filteredTeachers.filter(t => t.schoolId === selectedSchool.schoolId);
     const teacherTotalPages = Math.ceil(filteredTeachers.length / 10);
@@ -1244,7 +1292,7 @@ const AdminDashboard2 = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
                       <input
                         type="text"
-                        placeholder="Search teachers by name or subject..."
+                        placeholder="Search teachers by name..."
                         value={teacherSearch}
                         onChange={(e) => setTeacherSearch(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1261,6 +1309,10 @@ const AdminDashboard2 = () => {
                         <tr>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">On-board Date</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Name</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Email</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Gender</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Contact</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Address</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Qualification</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Role</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Status</th>
@@ -1272,8 +1324,12 @@ const AdminDashboard2 = () => {
                           <tr key={teacher.id} className="hover:bg-slate-50">
                             <td className="px-4 py-3 text-sm text-slate-800">{new Date(teacher.onboardingDate).toLocaleDateString('en-Gb')}</td>
                             <td className="px-4 py-3 text-sm text-slate-800 font-medium">{teacher.teacherName}</td>
+                            <td className="px-4 py-3 text-sm text-slate-800 font-medium">{teacher.teacherEmail}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{teacher.gender}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{teacher.teacherContact}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{teacher.address}, {teacher.city}, {teacher.state}, {teacher.country} - {teacher.pin}</td>
                             <td className="px-4 py-3 text-sm text-slate-600">{teacher.qualification}</td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{roles.map(role => role.roleId === teacher.role ? role.roleName : null)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{roles.find(role => role.roleId === teacher.role)?.roleName}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 text-xs rounded-full ${teacher.active === true ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                 }`}>
@@ -1343,10 +1399,15 @@ const AdminDashboard2 = () => {
                     <table className="w-full min-w-[600px]">
                       <thead className="bg-slate-50">
                         <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Roll No</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Name</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Date of Birth</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Gender</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Class</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Address</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Parent Name</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Parent Email</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Parent Contact</th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Status</th>
                           {/* <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">Action</th> */}
                         </tr>
@@ -1354,10 +1415,15 @@ const AdminDashboard2 = () => {
                       <tbody className="divide-y divide-slate-200">
                         {paginatedStudents.map(student => (
                           <tr key={student.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3 text-sm text-slate-800 font-medium">{student.rollId}</td>
                             <td className="px-4 py-3 text-sm text-slate-800 font-medium">{student.studentName}</td>
                             <td className="px-4 py-3 text-sm text-slate-600">{new Date(student.DOB).toLocaleDateString('en-Gb')}</td>
                             <td className="px-4 py-3 text-sm text-slate-600">{student.gender}</td>
                             <td className="px-4 py-3 text-sm text-slate-600">{classes.map(cls => cls.classId === student.classId ? cls.className : null)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600"> {student.address}, {student.city}, {student.state}, {student.country} - {student.pin}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{parents.find(parent => parent.parentId === student.parentId)?.parentName}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{parents.find(parent => parent.parentId === student.parentId)?.parentEmail}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{parents.find(parent => parent.parentId === student.parentId)?.parentContact}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 text-xs rounded-full ${student.active === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                 }`}>
@@ -1562,7 +1628,7 @@ const AdminDashboard2 = () => {
             {/* Filter Panel */}
             {showFilters && (
               <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div>
                     <label className="text-sm font-medium text-slate-700 mb-2 block">Order</label>
                     <select
@@ -1574,39 +1640,6 @@ const AdminDashboard2 = () => {
                       <option value="desc">Descending</option>
                     </select>
                   </div>
-
-                  {/* <div>
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">Status</label>
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => {
-                        setFilterStatus(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div> */}
-
-                  {/* <div>
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">Performance</label>
-                    <select
-                      value={filterPerformance}
-                      onChange={(e) => {
-                        setFilterPerformance(e.target.value);
-                        setCurrentPage(1);
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Levels</option>
-                      <option value="high">High (80%+)</option>
-                      <option value="medium">Medium (70-79%)</option>
-                      <option value="low">Low (&lt;70%)</option>
-                    </select>
-                  </div> */}
 
                   <div>
                     <label className="text-sm font-medium text-slate-700 mb-2 block">State</label>
@@ -1621,7 +1654,7 @@ const AdminDashboard2 = () => {
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">All States</option>
-                      {[...new Set(schools.map(school => school.state))].map(state => (
+                      {statesList.map(state => (
                         <option key={state} value={state}>{state}</option>
                       ))}
                     </select>
@@ -1635,11 +1668,13 @@ const AdminDashboard2 = () => {
                       onChange={(e) => {
                         setFilterCity(e.target.value);
                         setCurrentPage(1);
+                        setFilterPincode('all');
+
                       }}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">All Cities</option>
-                      {[...new Set(schools.map(school => school.city))].map(city => (
+                      {(loadCities(filterState)).map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -1657,8 +1692,25 @@ const AdminDashboard2 = () => {
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">All Pincodes</option>
-                      {[...new Set(schools.map(school => school.pin))].map(pin => (
+                      {(loadPincodes(filterCity)).map(pin => (
                         <option key={pin} value={pin}>{pin}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-2 block">Board</label>
+                    <select
+                      value={filterBoard}
+                      onChange={(e) => {
+                        setFilterBoard(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Boards</option>
+                      {boardsList.map(board => (
+                        <option key={board} value={board}>{board}</option>
                       ))}
                     </select>
                   </div>

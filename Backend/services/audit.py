@@ -64,8 +64,6 @@ async def get_user_audits(limit: int = 10, offset: int = 0):
             "success": True,
             "data": user_audits,
             "message": "User audits fetched successfully",
-            "filteredRecords": 0,
-            "total_records": total_records,
             "pagination": {
                 "page": offset,
                 "page_size": limit,

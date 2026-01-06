@@ -14,8 +14,11 @@ const UserAudit = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recordsPerPage, setRecordsPerPage] = useState(10);
+  const [offset, setOffset] = useState(0);
   const navigate = useNavigate();
   const { token } = useSelector((state) => state.auth);
+  const [paginatedData, setPaginatedData] = useState([]);
   const backend_url = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
@@ -35,32 +38,32 @@ const UserAudit = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${backend_url}/audit/user_audits`)
+        const response = await fetch(`${backend_url}/audit/user_audits?limit=${recordsPerPage}&offset=${offset}`);
         const data = await response.json();
         if (!response.ok) { // Check for HTTP errors
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const auditData = data?.data
         for (const audit of auditData) {
-            const users = await fetch(`${backend_url}/users/id?user_id=${Number(audit.user_id)}`);
-            const userData = await users.json();
-            if(userData?.data){
-              const userLongins = await fetch(`${backend_url}/sessions?sessionId=${token}`);
-              const userLoginData = await userLongins.json();
-              const LoginData = userLoginData?.data
-              const deviceDetails = LoginData?.data?.deviceInfo;
-              audit.email = (userData?.data)?.userEmail
-              audit.ip = deviceDetails?.ip
-              audit.device =  deviceDetails?.device
-              audit.os = deviceDetails?.os
-              audit.browser = deviceDetails?.browser
-              audit.login_time = new Date(LoginData?.data?.loginTime).toLocaleTimeString()
-              audit.status = LoginData?.data?.isActive ? 'Active' : 'Inactive'
-              audit.user_id = (userData?.data)?.userName
-            }
+            const userLongins = await fetch(`${backend_url}/sessions?sessionId=${audit.sessionId}`)
+            const userLoginData = await userLongins.json();
+            const LoginData = userLoginData?.data
+            const deviceDetails = LoginData?.data?.deviceInfo;
+            const userData = await fetch(`${backend_url}/users/id?user_id=${audit.user_id}`);
+            const user = await userData.json();
+            audit.name = (user?.data)?.userName
+            audit.email = (user?.data)?.userEmail
+            audit.ip = deviceDetails?.ip
+            audit.device =  deviceDetails?.device
+            audit.os = deviceDetails?.os
+            audit.browser = deviceDetails?.browser
+            audit.login_time = new Date(LoginData?.data?.loginTime).toLocaleTimeString()
+            audit.status = LoginData?.data?.isActive ? 'Active' : 'Inactive'
+            audit.user_id = (user?.data)?.userName
         }
         console.log(auditData)
         setAudit(auditData);
+        setPaginatedData(data?.pagination);
       } catch (error) {
         console.error('Failed to fetch dropdowns', error);
       } finally {
@@ -68,21 +71,14 @@ const UserAudit = () => {
       }
     }
     fetchData()
-    }, []);
+    }, [recordsPerPage, offset]);
 
 
     const auditLogs = audit;
     console.log(auditLogs)
 
   //Pagination
-  const recordsPerPage = 10;
-  const totalPages = Math.ceil(auditLogs.length / recordsPerPage);
-  
-
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * recordsPerPage;
-    return auditLogs.slice(startIndex, startIndex + recordsPerPage);
-  }, [currentPage,auditLogs]);
+  const totalPages = paginatedData?.total_pages;
 
   const openModal = (log) => {
     setSelectedLog(log);
@@ -97,6 +93,7 @@ const UserAudit = () => {
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+      setOffset((page - 1) * recordsPerPage);
     }
   };
 
@@ -129,10 +126,10 @@ const UserAudit = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {(loading) ? <ThreeDots height="50" width="50" radius="9" color="#4fa94d"  /> : paginatedLogs.map((log) => (
+            {(loading) ? <ThreeDots height="50" width="50" radius="9" color="#4fa94d"  /> : auditLogs.map((log) => (
               <tr key={log.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleDateString('en-Gb')}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.user_id}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.ip}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.device}</td>
@@ -170,7 +167,7 @@ const UserAudit = () => {
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * recordsPerPage + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(currentPage * recordsPerPage, auditLogs.length)}
+                {(  (currentPage - 1) * recordsPerPage ) + auditLogs.length}
               </span>{' '}
               of <span className="font-medium">{auditLogs.length}</span> results
             </p>

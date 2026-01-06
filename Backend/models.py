@@ -368,6 +368,8 @@ class SessionLog(Base):
 class APIENUM(enum.Enum):
     GET = 0
     POST = 1
+    PUT = 2
+    DELETE = 3
 
 class RESPONSEENUM(enum.Enum):
     SUCCESS = 0
@@ -377,8 +379,10 @@ class Logger(Base):
     __tablename__ = "logger"
     
     id = Column(Integer, primary_key=True, index=True)
-    api = Column(String(255), nullable=False)
-    apiEnum = Column(SQLEnum(APIENUM), nullable=False)
-    responseEnum = Column(SQLEnum(RESPONSEENUM), nullable=False)
+    api_endpoint = Column(String(255), nullable=False)
+    api_type = Column(SQLEnum(APIENUM), nullable=False)
+    request = Column(String(255), nullable=False)
+    statusCode = Column(Integer, nullable=False)
+    status = Column(SQLEnum(RESPONSEENUM), nullable=False)
     response = Column(String(255), nullable=False)
-    created_at = Column(TIMESTAMP, default=datetime.now)
+    created_at = Column(TIMESTAMP, default=datetime.now())

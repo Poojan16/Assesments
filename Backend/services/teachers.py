@@ -1,6 +1,6 @@
 from database import SessionLocal
 from models import *
-from uploadFile import upload_and_encrypt_file, decrypt_file
+from uploadFile import upload_and_encrypt_file, decrypt_file, FileScan
 from fastapi import APIRouter, HTTPException
 from fastapi import UploadFile, File, Form, Body
 from pydantic import EmailStr
@@ -52,29 +52,48 @@ async def create_teacher(
     try:
         db = SessionLocal()
         if photo:
-            photo_url = await upload_and_encrypt_file(photo, "teachers/")
-            photo_url = photo_url["file_url"]
-            print(photo_url)
+            check_file = await FileScan(photo)
+            if(check_file):
+                photo_url = await upload_and_encrypt_file(photo, "teachers/")
+                photo_url = photo_url["file_url"]
+            else:
+                photo_url = None
         else:
             photo_url = None
         if PAN:
-            PAN_url = await upload_and_encrypt_file(PAN, "teachers/")
-            PAN_url = PAN_url["file_url"]
+            check_file = await FileScan(PAN)
+            if(check_file):
+                PAN_url = await upload_and_encrypt_file(PAN, "teachers/")
+                PAN_url = PAN_url["file_url"]
+            else:
+                PAN_url = None
         else:
             PAN_url = None
         if aadhar:
-            aadhar_url = await upload_and_encrypt_file(aadhar, "teachers/")
-            aadhar_url = aadhar_url["file_url"]
+            check_file = await FileScan(aadhar)
+            if(check_file):
+                aadhar_url = await upload_and_encrypt_file(aadhar, "teachers/")
+                aadhar_url = aadhar_url["file_url"]
+            else:
+                aadhar_url = None
         else:
             aadhar_url = None
         if addressProof:
-            addressProof_url = await upload_and_encrypt_file(addressProof, "teachers/")
-            addressProof_url = addressProof_url["file_url"]
+            check_file = await FileScan(addressProof)
+            if(check_file):
+                addressProof_url = await upload_and_encrypt_file(addressProof, "teachers/")
+                addressProof_url = addressProof_url["file_url"]
+            else:
+                addressProof_url = None
         else:
             addressProof_url = None
         if DL:
-            DL_url = await upload_and_encrypt_file(DL, "teachers/")
-            DL_url = DL_url["file_url"]
+            check_file = await FileScan(DL)
+            if(check_file):
+                DL_url = await upload_and_encrypt_file(DL, "teachers/")
+                DL_url = DL_url["file_url"]
+            else:
+                DL_url = None
         else:
             DL_url = None
         teacher = Teacher(

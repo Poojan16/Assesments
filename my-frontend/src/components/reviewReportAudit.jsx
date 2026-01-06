@@ -19,15 +19,6 @@ const ReviewReportAudit = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate a loading process (e.g., data fetching, component mounting)
-    const timer = setTimeout(() => {
-      setLoading(false); // Hide loader after a delay
-    }, 1000); // Adjust delay as needed
-
-    return () => clearTimeout(timer); // Cleanup timer on unmount
-  }, []);
-
-  useEffect(() => {
     document.title = 'Audit Trail'; // Set the desired title here
   }, []);
 
@@ -58,7 +49,14 @@ const ReviewReportAudit = () => {
         setAudit(workFlowData?.data);
         setTeachers(teachersData?.data);
         setReports(reportsData?.data);
-        setRoles(rolesData?.data);
+
+        const updatedRoles = rolesData?.data.map((role, roleId) => {
+          return {
+            ...role,
+            roleId: roleId + 1,
+          };
+        })
+        setRoles(updatedRoles);
       } catch (error) {
         console.error('Failed to fetch dropdowns', error);
       } finally {
@@ -74,7 +72,7 @@ const ReviewReportAudit = () => {
   const recordsPerPage = 10;
   const totalPages = Math.ceil(auditLogs.length / recordsPerPage);
   
-  console.log(auditLogs)
+  console.log(roles)
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * recordsPerPage;
@@ -128,7 +126,7 @@ const ReviewReportAudit = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(log.created_at).toLocaleDateString('en-Gb')}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.reviewId}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teachers.find((teacher) => teacher.teacherId === log.teacherId)?.teacherName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{roles.find((role) => role.roleId === teachers.find((teacher) => teacher.teacherId === log.teacherId)?.role)?.roleName}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{roles.find((role) => role.roleId === log.role)?.roleName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{reports.find((report) => report.reportId === log.reportId)?.comments}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{audit.find((audit) => audit.reviewId === log.reviewId)?.comments}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teachers.find((teacher) => teacher.teacherId === log.teacherId)?.teacherName}</td>

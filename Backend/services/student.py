@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from models import *
 from database import *
 from fastapi import HTTPException
-from uploadFile import upload_and_encrypt_file, decrypt_file
+from uploadFile import upload_and_encrypt_file, decrypt_file, FileScan
 from fastapi import Form, File, UploadFile
 from typing import Optional, Union
 from pydantic import EmailStr
@@ -119,19 +119,31 @@ async def create_student(
         # Student documents (optional check)
         if adhaar:
             try:
-                adhaar = (await upload_and_encrypt_file(adhaar, 'students/'))["file_url"]
+                check_file = FileScan(adhaar)
+                if(check_file):
+                    adhaar = (await upload_and_encrypt_file(adhaar, 'students/'))["file_url"]
+                else:
+                    adhaar = None
             except:
                 raise HTTPException(status_code=500, detail="Aadhar not uploaded")
 
         if birthCertificate:
             try:
-                birthCertificate = (await upload_and_encrypt_file(birthCertificate, 'students/'))["file_url"]
+                check_file = FileScan(birthCertificate)
+                if(check_file):
+                    birthCertificate = (await upload_and_encrypt_file(birthCertificate, 'students/'))["file_url"]
+                else:
+                    birthCertificate = None
             except:
                 raise HTTPException(status_code=500, detail="Birth Certificate not uploaded")
 
         if photo:
             try:
-                photo = (await upload_and_encrypt_file(photo, 'students/'))["file_url"]
+                check_file = FileScan(photo)
+                if(check_file):
+                    photo = (await upload_and_encrypt_file(photo, 'students/'))["file_url"]
+                else:
+                    photo = None
             except:
                 raise HTTPException(status_code=500, detail="Photo not uploaded")
 
@@ -237,36 +249,42 @@ async def update_student(
 
         # Aadhar upload
         if adhaar and type(adhaar) != str:
-            aadhar_url = (
-                await upload_and_encrypt_file(adhaar, "students/")
-            )["file_url"]
+            check_file = FileScan(adhaar)
+            if(check_file):
+                aadhar_url = (
+                    await upload_and_encrypt_file(adhaar, "students/")
+                )["file_url"]
 
-            if db_student.adhaar:
-                os.unlink(db_student.adhaar)
+                if db_student.adhaar:
+                    os.unlink(db_student.adhaar)
 
-            db_student.adhaar = aadhar_url
+                db_student.adhaar = aadhar_url
 
         # Birth certificate upload
         if birthCertificate and type(birthCertificate) != str:
-            bc_url = (
-                await upload_and_encrypt_file(birthCertificate, "students/")
-            )["file_url"]
+            check_file = FileScan(birthCertificate)
+            if(check_file):
+                birth_certificate_url = (
+                    await upload_and_encrypt_file(birthCertificate, "students/")
+                )["file_url"]
 
-            if db_student.birthCertificate:
-                os.unlink(db_student.birthCertificate)
+                if db_student.birthCertificate:
+                    os.unlink(db_student.birthCertificate)
 
-            db_student.birthCertificate = bc_url
+                db_student.birthCertificate = birth_certificate_url
 
         # Photo upload
         if photo and type(photo) != str:
-            photo_url = (
-                await upload_and_encrypt_file(photo, "students/")
-            )["file_url"]
+            check_file = FileScan(photo)
+            if(check_file):
+                photo_url = (
+                    await upload_and_encrypt_file(photo, "students/")
+                )["file_url"]
 
-            if db_student.photo:
-                os.unlink(db_student.photo)
+                if db_student.photo:
+                    os.unlink(db_student.photo)
 
-            db_student.photo = photo_url
+                db_student.photo = photo_url
 
         db.commit()
         db.refresh(db_student)
@@ -425,4 +443,17 @@ async def update_student_score(id:int, score: int = Form(...)):
         }
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+async def get_parents():
+    try:
+        db = SessionLocal()
+        parents = db.query(Parent).all()
+        return {
+            "status_code": 200,
+            "success": True,
+            "data": parents,
+            "message": "Parents fetched successfully",
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

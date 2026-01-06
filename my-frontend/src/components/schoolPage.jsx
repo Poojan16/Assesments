@@ -1642,13 +1642,6 @@ const ClassTeacherDashboard = () => {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-800">Submitted Reports</h3>
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <Upload size={18} />
-                  Upload Report
-                </button>
               </div>
             </div>
             <div className="p-6">

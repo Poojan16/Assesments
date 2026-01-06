@@ -264,3 +264,11 @@ class ProvisionRequest(BaseModel):
     offBoardingDate: date | None = None
     changedBy: Optional[int] = None
 
+class LoggerBase(BaseModel):
+    api_endpoint: str
+    api_type: str
+    request: str
+    statusCode: int
+    status: str
+    response: str
+    

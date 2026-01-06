@@ -1,62 +1,6 @@
-// import { createSlice } from '@reduxjs/toolkit';
-
-// // Load initial state from localStorage
-// const loadState = () => {
-//   try {
-//     const serializedState = localStorage.getItem('authState');
-//     if (serializedState === null) {
-//       return undefined;
-//     }
-//     return JSON.parse(serializedState);
-//   } catch (err) {
-//     return undefined;
-//   }
-// };
-
-// const initialState = loadState() || {
-//   isAuthenticated: false,
-//   user: null,
-//   token: null,
-//   roles: [],
-// };
-
-// const authSlice = createSlice({
-//   name: 'auth',
-//   initialState,
-//   reducers: {
-//     loginSuccess: (state, action) => {
-//       const users = localStorage.getItem('authState');
-//       console.log(users);
-//       state.isAuthenticated = true;
-//       console.log(action)
-//       state.user = action.payload;
-//       state.token = action.payload.token;
-      
-//       // Save to localStorage
-//       localStorage.setItem('authState', JSON.stringify(state));
-//     },
-//     logout: (state) => {
-//       state.isAuthenticated = false;
-//       state.user = null;
-//       state.token = null;
-      
-//       // Clear localStorage
-//       localStorage.removeItem('authState');
-//     },
-//     initializeAuth: (state) => {
-//       const savedState = loadState();
-//       if (savedState) {
-//         return { ...state, ...savedState };
-//       }
-//     },
-//   },
-// });
-
-// export const { loginSuccess, logout, initializeAuth } = authSlice.actions;
-// export default authSlice;
-
-
 import { createSlice } from '@reduxjs/toolkit';
+
+const backend_url = process.env.REACT_APP_BACKEND_URL;
 
 const loadState = () => {
   try {
@@ -83,7 +27,7 @@ export const checkSessionStatus = async (token) => {
   if (!token) return { expired: true, valid: false };
   
   try {
-    const response = await fetch('http://127.0.0.1:8000/sessions?sessionId=' + token);
+    const response = await fetch(`${backend_url}/sessions?sessionId=` + token);
     
     if (!response.ok) {
       return { expired: true, valid: false };
@@ -293,8 +237,8 @@ export const checkSessionExpiry = () => async (dispatch, getState) => {
     if (!sessionStatus.valid || sessionStatus.expired) {
       if (typeof window !== 'undefined') {
         // Only redirect if we're not already on login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+        if (!window.location.pathname.includes('/')) {
+          window.location.href = '/';
         }
       }
     }
@@ -330,8 +274,8 @@ export const sessionCheckMiddleware = (store) => (next) => (action) => {
   if (state.sessionExpired && state.sessionChecked) {
     if (protectedActions.includes(action.type)) {
       console.log('Session expired, redirecting to login');
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/')) {
+        window.location.href = '/';
       }
       return;
     }

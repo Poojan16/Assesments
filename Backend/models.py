@@ -302,7 +302,7 @@ class UserAudit(Base):
     ua_id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.userId"), nullable=False)
     activity = Column(String(255))
-    sessionId = Column(Integer, ForeignKey("sessions.id"), nullable=False)
+    sessionId = Column(Integer, ForeignKey("sessions.id"), nullable=True, default=None)
     created_at = Column(TIMESTAMP, default=datetime.now())
     iModifyBy = Column(Integer, ForeignKey("teachers.teacherId"), nullable=True)
     iStatus = Column(Boolean, default=False)

@@ -334,6 +334,8 @@ const ClassTeacherDashboard = () => {
     fetchData();
   }, [teacher]);
 
+  console.log(quickStats)
+
   // Filter unread notifications
   const unreadNotifications = useMemo(() => {
     return review.filter(notification => !seenNotifications.has(notification.reviewId));
@@ -672,10 +674,10 @@ const ClassTeacherDashboard = () => {
       const scoreHeaders = teacherSubjects.map(subject => 
         `${subject.subjectName} Score`
       );
-      const signatureHeaders = teacherSubjects.map(subject =>
-        `${subject.subjectName} Signature`
-      );
-      const allHeaders = [...headers, ...scoreHeaders, ...signatureHeaders];
+      // const signatureHeaders = teacherSubjects.map(subject =>
+      //   `${subject.subjectName} Signature`
+      // );
+      const allHeaders = [...headers, ...scoreHeaders];
 
       // Set column widths and add headers
       worksheet.columns = allHeaders.map(header => ({
@@ -732,10 +734,10 @@ const ClassTeacherDashboard = () => {
         });
 
         // Add signature status for each subject
-        teacherSubjects.forEach(subject => {
-          const hasSignature = signatures[subject.subjectId] ? 'Signed' : 'Not Signed';
-          rowData.push(hasSignature);
-        });
+        // teacherSubjects.forEach(subject => {
+        //   const hasSignature = signatures[subject.subjectId] ? 'Signed' : 'Not Signed';
+        //   rowData.push(hasSignature);
+        // });
 
         const row = worksheet.addRow(rowData);
         
@@ -962,6 +964,7 @@ const ClassTeacherDashboard = () => {
 
   const SendReport = async () => {
     setGeneratePdf(true);
+    setSendingReports(true);
   };
 
   const handlePdfGenerated = (pdfInfo) => {
@@ -1402,12 +1405,16 @@ const ClassTeacherDashboard = () => {
                           <div className="flex items-center justify-between gap-2">
                             <span>{subject.subjectName}</span>
                             <button
+                              disabled={!mapTeacher.find(t => 
+                                t.subjectId === subject.subjectId && t.teacherId === teacher.teacherId
+                              )}
                               onClick={() => {
                                 setSignatureSubject(subject);
                                 (Array.from(selectedStudents)).length <= 0 ? alert('Please select at least one student') : setShowSignatureModal(true);
                               }}
                               className={`p-1 rounded hover:bg-gray-200 text-gray-400`}
                               title={signatures[subject.subjectId] ? 'Signed' : 'Not Signed'}
+                            
                             >
                               <Signature size={16} />
                             </button>
@@ -1464,7 +1471,7 @@ const ClassTeacherDashboard = () => {
                                 signature.studentId === student.studentId
                               );
                               const canEdit = mapTeacher.find(t => 
-                                t.subjectId === subject.subjectId && t.teacherId === teacher.teacherId
+                                t.subjectId === subject.subjectId && t.teacherId === teacher.teacherId && t.classId === student.classId
                               );
                               const cellKey = `${student.studentId}-${subject.subjectId}`;
                               const isSaving = savingCells.has(cellKey);
@@ -1644,7 +1651,7 @@ const ClassTeacherDashboard = () => {
                 <h3 className="text-lg font-semibold text-gray-800">Submitted Reports</h3>
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 max-h-[calc(90vh-80px)] overflow-y-auto">
               {reports.length > 0 ? (
                 reports.map(report => (
                   <div

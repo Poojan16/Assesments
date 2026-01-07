@@ -6,6 +6,7 @@ export default function AddSchoolForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [attachments, setAttachments] = useState([]);
+  const backend_url = process.env.REACT_APP_BACKEND_URL;
 
   const {
     register,
@@ -55,7 +56,24 @@ export default function AddSchoolForm() {
     });
     
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const addSchool = await fetch(`${backend_url}/admin/schools/`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!addSchool.ok) {
+      console.error('Error adding school:', addSchool.statusText);
+      setIsSubmitting(false);
+      return;
+    }
+    
+    const addSchoolData = await addSchool.json();
+    if (addSchoolData?.detail) {
+      console.error('Error adding school:', addSchoolData);
+      setIsSubmitting(false);
+      return;
+    }
+
     
     console.log('School Data:', Object.fromEntries(formData));
     setSubmitSuccess(true);

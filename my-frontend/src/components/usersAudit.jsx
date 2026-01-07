@@ -45,7 +45,7 @@ const UserAudit = () => {
         }
         const auditData = data?.data
         for (const audit of auditData) {
-            const userLongins = await fetch(`${backend_url}/sessions?sessionId=${audit.sessionId}`)
+            const userLongins = await fetch(`${backend_url}/sessionsId?sessionId=${audit.sessionId}`)
             const userLoginData = await userLongins.json();
             const LoginData = userLoginData?.data
             const deviceDetails = LoginData?.data?.deviceInfo;

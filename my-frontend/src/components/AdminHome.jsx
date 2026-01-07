@@ -298,6 +298,7 @@ useEffect(() => {
       subjectPerformance[subjectName].topScore = Math.max(subjectPerformance[subjectName].topScore, score.score);
       subjectPerformance[subjectName].lowScore = Math.min(subjectPerformance[subjectName].lowScore, score.score);
     });
+    console.log(subjectPerformance);
 
     const subjectWiseData = Object.keys(subjectPerformance).map(subjectName => ({
       name: subjectName,
@@ -960,8 +961,7 @@ useEffect(() => {
     // Filter and paginate students
     const filteredStudents = allStudents.filter(s =>
       s.schoolId === selectedSchool.schoolId &&
-      (s.studentName.toLowerCase().includes(studentSearch.toLowerCase()) ||
-        s.grade.toLowerCase().includes(studentSearch.toLowerCase()))
+      (s.studentName.toLowerCase().includes(studentSearch.toLowerCase()))
     );
     const studentTotalPages = Math.ceil(filteredStudents.length / 10);
     const paginatedStudents = filteredStudents.slice((studentPage - 1) * 10, studentPage * 10);
@@ -982,22 +982,6 @@ useEffect(() => {
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{selectedSchool.schoolName}</h1>
                 <p className="text-slate-600 text-sm mt-1">{selectedSchool.city}, {selectedSchool.state} - {selectedSchool.pin} • Est. {selectedSchool.established_year} • Board: {selectedSchool.board}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate('/audit')}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Activity size={18} />
-                  View Audit
-                </button>
-                <button
-                  onClick={exportData}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Download size={18} />
-                  Export Analytics
-                </button>
               </div>
             </div>
 
@@ -1749,6 +1733,7 @@ useEffect(() => {
                     className="w-64 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="">Select time</option>
+                    <option value="1">1 minute</option>
                     <option value="3">3 minutes</option>
                     <option value="5">5 minutes</option>
                     <option value="10">10 minutes</option>

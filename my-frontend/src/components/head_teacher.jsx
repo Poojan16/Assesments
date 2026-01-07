@@ -116,7 +116,7 @@ const HeadTeacher = () => {
           fetch(`${backend_url}/students/score`),
           fetch(`${backend_url}/admin/schools/${(teacherData?.data)?.schoolId}`),
           fetch(`${backend_url}/grades/`),
-          fetch(`${backend_url}/reports/status`)
+          fetch(`${backend_url}/teachers/getWorkflow_all`)
         ]);
 
         const classesData = await classesResponse.json();
@@ -149,11 +149,7 @@ const HeadTeacher = () => {
 
         setSubjectScores(filteredStudentsScore);
 
-        // Set reports status
-        const statusMap = {};
-        reportsStatusData?.data?.forEach(report => {
-          statusMap[report.studentId] = report.status;
-        });
+        const statusMap = reportsStatusData?.data || {};
         setReportsStatus(statusMap);
 
         const filteredTeachers = (teachersData?.data || []).filter((teacherItem) => 
@@ -195,7 +191,7 @@ const HeadTeacher = () => {
   }, [user]);
 
   console.log(subjectScores);
-  console.log(selectedStudents);
+  console.log(reportsStatus);
 
   const getPerformance = (gradeLetter) => {
     switch (gradeLetter) {
@@ -327,8 +323,22 @@ const HeadTeacher = () => {
     );
   };
 
+  const [generatePdf, setGeneratePdf] = useState(false);
+  const [pdfData, setPdfData] = useState(null);
+  const SendReport = async () => {
+      setGeneratePdf(true);
+    };
+
+  const handlePdfGenerated = (pdfInfo) => {
+      console.log("PDF generated successfully:", pdfInfo);
+      setPdfData(pdfInfo?.allPdfs);
+      console.log(pdfData);
+      setGeneratePdf(false);
+      handleBulkSendEmails(pdfInfo?.allPdfs);
+    };
+
   // Bulk send emails function
-  const handleBulkSendEmails = async () => {
+  const handleBulkSendEmails = async (pdfData) => {
     if (selectedStudents.size === 0) {
       setErrorMessage("No students selected");
       setTimeout(() => setErrorMessage(''), 3000);
@@ -346,6 +356,7 @@ const HeadTeacher = () => {
     setEmailProgress(0);
 
     const studentArray = Array.from(selectedStudents);
+    console.log(studentArray);
     let sentCount = 0;
     let failedCount = 0;
 
@@ -381,6 +392,7 @@ const HeadTeacher = () => {
       setEmailProgress(progress);
       setEmailStatus({ sent: sentCount, failed: failedCount, total: studentArray.length });
     }
+    console.log(sentCount, failedCount);
 
     setSendingEmails(false);
     
@@ -1216,7 +1228,9 @@ ${schools?.schoolName || 'School'}
     }
   };
 
+  const [provisionSubmit, setProvisionSubmit] = useState(false);
   const handleProvisionSubmit = async () => {
+    setProvisionSubmit(true);
     try {
       if (isStudent) {
     
@@ -1282,6 +1296,8 @@ ${schools?.schoolName || 'School'}
     } catch (error) {
       setErrorMessage('Error submitting provision');
       console.error('Provision submission error:', error);
+    }finally{
+      setProvisionSubmit(false);
     }
   };
 
@@ -1353,19 +1369,6 @@ ${schools?.schoolName || 'School'}
     }
   }, [successMessage, errorMessage]);
 
-  const [generatePdf, setGeneratePdf] = useState(false);
-  const [pdfData, setPdfData] = useState(null);
-  const SendReport = async () => {
-      setGeneratePdf(true);
-    };
-
-  const handlePdfGenerated = (pdfInfo) => {
-      console.log("PDF generated successfully:", pdfInfo);
-      setPdfData(pdfInfo?.allPdfs);
-      console.log(pdfData);
-      setGeneratePdf(false);
-      handleBulkSendEmails();
-    };
 
   if (loading) return <Loader />;
 
@@ -1705,7 +1708,7 @@ ${schools?.schoolName || 'School'}
               <div>
                 <div className="text-sm text-gray-600 mb-1">Ready Reports</div>
                 <div className="text-3xl font-bold text-emerald-600">
-                  {students.filter(s => isReportReadyForSending(s.studentId)).length}
+                  {reportsStatus.length}
                 </div>
               </div>
               <div className="bg-emerald-100 p-3 rounded-full">
@@ -2692,12 +2695,26 @@ ${schools?.schoolName || 'School'}
               )}
               
               <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleProvisionSubmit}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors duration-200 font-medium"
-                >
-                  Submit
-                </button>
+                {
+                  provisionSubmit ?
+                  (
+                    <button
+                      onClick={handleProvisionSubmit}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition-colors duration-200 font-medium"
+                    >
+                      Submitting...
+                    </button>
+                  )
+                  :
+                  (
+                    <button
+                      onClick={handleProvisionSubmit}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition-colors duration-200 font-medium"
+                    >
+                      Submit
+                    </button>
+                  )
+                }
                 <button
                   onClick={() => setShowProvisionModal(false)}
                   className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition-colors duration-200 font-medium"

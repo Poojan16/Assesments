@@ -721,7 +721,6 @@ const EducationDashboard = () => {
               { id: 'performance', label: 'Performance Analysis', icon: TrendingUpIcon },
               { id: 'regional', label: 'Regional Analytics', icon: MapPin },
               { id: 'subjects', label: 'Subject Analysis', icon: BookOpen },
-              { id: 'insights', label: 'Actionable Insights', icon: Lightbulb }
             ].map(view => (
               <button
                 key={view.id}

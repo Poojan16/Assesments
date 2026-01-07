@@ -433,7 +433,6 @@ def send_email_sync(recipient_email: str, subject: str, body: str):
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'html'))
-        msg.attach()
     
 
         # Establish a secure connection using SMTP_SSL for port 465

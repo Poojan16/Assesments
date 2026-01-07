@@ -326,9 +326,9 @@ export default function StudentForm() {
     }
   };
 
-  const onSubmit = async (data) => {
+  const onSubmitData = async (data) => {
+    console.log('API call started');
     setIsSubmitting(true);
-
     const form = document.querySelector('form');
     const formElements = form.elements;
     for (let i = 0; i < formElements.length; i++) {
@@ -403,9 +403,9 @@ export default function StudentForm() {
       for (let i = 0; i < formElements.length; i++) {
         formElements[i].disabled = false;
       }
+    }finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   const handleReset = () => {
@@ -428,7 +428,7 @@ export default function StudentForm() {
     clearErrors();
     
     if (!isEditMode) {
-      navigate('/students');
+      navigate('/add-student');
     } else {
       // For edit mode, reset to original data
       if (studentData) {
@@ -466,7 +466,7 @@ export default function StudentForm() {
         break;
     }
 
-    if (isValid) {
+    if (isValid && currentStep < 5) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -502,7 +502,7 @@ export default function StudentForm() {
       color: state.isSelected ? 'white' : '#374151',
       padding: '10px 12px',
       '&:active': {
-        backgroundColor: '#4f46e5',
+        backgrousubmitndColor: '#4f46e5',
         color: 'white'
       }
     }),
@@ -621,7 +621,7 @@ export default function StudentForm() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} encType="multipart/form-data" className="bg-white rounded-b-2xl shadow-lg p-8">
+        <form encType="multipart/form-data" className="bg-white rounded-b-2xl shadow-lg p-8">
           {currentStep === 1 && (
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
@@ -1251,7 +1251,9 @@ export default function StudentForm() {
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit(onSubmitData)}
+                  hidden={currentStep > steps.length}
                   disabled={isSubmitting}
                   className={`flex-1 px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 focus:ring-4 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isEditMode ? 'bg-yellow-600 focus:ring-yellow-300' : 'bg-green-600 focus:ring-green-300'} text-white`}
                 >

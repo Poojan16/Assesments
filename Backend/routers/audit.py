@@ -3,6 +3,7 @@ from database import SessionLocal
 from database import get_db
 from models import Audit, UserAudit
 from services import audit
+from typing import Optional
 
 router = APIRouter(
     prefix="/audit",
@@ -42,7 +43,7 @@ async def get_user_audits(limit: int = 10, offset: int = 0):
 @router.post("/user_audits")
 async def post_user_audit(
     user_id: int, activity: str,
-    sessionId: int
+    sessionId: Optional[int] = None
 ):
     try:
         user_audit = await audit.post_user_audit(user_id, activity, sessionId)

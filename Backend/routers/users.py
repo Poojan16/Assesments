@@ -61,7 +61,7 @@ async def resetPassword(token:str):
         otp = await users.resetPassword(token)
         return otp
     except Exception as e:
-        raise httpException(status_code=400, detail="Something went wrong while resetting password")
+        raise httpException(status_code=400, detail="Something went wrong while resetting password" + str(e))
     
 # admin will pass minutes for rest password link expiry and set it to the function
 @router.post("/expiry")

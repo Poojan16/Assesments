@@ -161,7 +161,7 @@ async def resetPassword(token:str):
             try:
                 send_email_sync('pujansoni.jcasp@gmail.com', subject, body)
                 db = SessionLocal()
-                await post_user_audit(user_info.userId, "Reset Password Link Sent", sessionId=0)
+                await post_user_audit(user_info.userId, "Reset Password Link Sent")
                 return {
                     "status_code": 200,
                     "success": True,

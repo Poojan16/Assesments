@@ -39,12 +39,13 @@ async def lifespan(app: FastAPI):
     # check_rabbitmq_connection()
     
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        schedule_annual_notifications,
-        CronTrigger(hour=0, minute=0, day="*/2"), 
-        id="every_two_day_task",
-        replace_existing=True
-    )
+    # scheduler.add_job(
+    #     schedule_annual_notifications,
+    #     CronTrigger(hour=0, minute=0, day="*"), 
+    #     id="every_two_day_task",
+    #     replace_existing=True
+    # )
+    # scheduler.add_job(func=schedule_annual_notifications, trigger="interval", seconds=20)
     # scheduler.add_job(func=Consumer, trigger="interval", seconds=10)
     scheduler.start()
     yield
@@ -350,19 +351,40 @@ async def background_testing(background_tasks: BackgroundTasks, metadatas: Optio
 @app.get("/sessions")
 async def sessions(sessionId:str):
     try:
-        db = SessionLocal()
-        sessions = db.query(SessionLog).filter(SessionLog.sessionId == sessionId).first()
-        return {
-            "status_code": 200,
-            "success": True,
-            "data": {
-                "expired": False if sessions.isActive else True,
-                "valid": sessions.isActive,
-                "data":sessions,
-                "expiresAt": sessions.expiresAt
-            },
-            "message": "Sessions fetched successfully",
-        }
+        if sessionId:
+            db = SessionLocal()
+            sessions = db.query(SessionLog).filter(SessionLog.sessionId == sessionId).first()
+            return {
+                "status_code": 200,
+                "success": True,
+                "data": {
+                    "expired": False if sessions.isActive else True,
+                    "valid": sessions.isActive,
+                    "data":sessions,
+                    "expiresAt": sessions.expiresAt
+                },
+                "message": "Sessions fetched successfully",
+            }
+    except Exception as e:
+        raise httpException(status_code=400, detail=str(e))
+    
+@app.get("/sessionsId")
+async def sessions(sessionId:Optional[int] = None):
+    try:
+        if sessionId:
+            db = SessionLocal()
+            sessions = db.query(SessionLog).filter(SessionLog.id == sessionId).first()
+            return {
+                "status_code": 200,
+                "success": True,
+                "data": {
+                    "expired": False if sessions.isActive else True,
+                    "valid": sessions.isActive,
+                    "data":sessions,
+                    "expiresAt": sessions.expiresAt
+                },
+                "message": "Sessions fetched successfully",
+            }
     except Exception as e:
         raise httpException(status_code=400, detail=str(e))
     

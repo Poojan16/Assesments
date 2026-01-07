@@ -30,7 +30,6 @@ async def get_logger(limit: int = 10, offset: int = 0):
         db.close()
         
 async def add_log(logger: LoggerBase):
-    
     try:
         db = SessionLocal()
         log = Logger(

@@ -86,7 +86,7 @@ const ForgotPasswordForm = () => {
           if(resetData?.status_code === 200){
             setMessage("A link is sent to your email address for reset password");
             setTimeout(() => {
-              navigate('/login')
+              navigate('/')
             }, 5000);
           }
         }

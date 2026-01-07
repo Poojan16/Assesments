@@ -48,7 +48,7 @@ const LoginPage = () => {
           console.log(response)
 
           if (!response.ok) {
-            const message = "Login failed: " + response.statusText;
+            const message = "Login failed: Credentials do not match";
             setServerError(message);
             // timeout
             const timer = setTimeout(() => {
@@ -82,8 +82,6 @@ const LoginPage = () => {
         finally{
           setLoading(false)
         }
-      
-    
   }; 
  
   const handleForm = (data) => {

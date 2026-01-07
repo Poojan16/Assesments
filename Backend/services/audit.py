@@ -4,6 +4,7 @@ from database import get_db
 from models import Audit, UserAudit
 from sqlalchemy import select
 import math
+from typing import Optional
 
 
 async def get_audits(limit: int = 10, offset: int = 0):
@@ -77,7 +78,7 @@ async def get_user_audits(limit: int = 10, offset: int = 0):
         db.close()
 
 async def post_user_audit(
-    user_id: int, activity: str, sessionId
+    user_id: int, activity: str, sessionId: Optional[int] = None
 ):
     try:
         db = SessionLocal()

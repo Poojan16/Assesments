@@ -15,6 +15,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=72)
     confirm_password: str = Field(..., min_length=8, max_length=72)
+    role: Optional[UserRoleEnum] = UserRoleEnum.EMPLOYEE  # Default to Employee
 
     @field_validator('password')
     @classmethod

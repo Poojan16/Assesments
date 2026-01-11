@@ -79,11 +79,11 @@ const Dashboard = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Welcome Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 text-white">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 text-black">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back, {user?.first_name}! 👋
           </h1>
-          <p className="text-blue-100">
+          <p className="text-black">
             Manage your leave requests and track your time off from here.
           </p>
         </div>

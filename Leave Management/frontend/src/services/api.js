@@ -49,12 +49,13 @@ export const leaveAPI = {
   applyLeave: (data) => api.post('/api/leaves/apply', data),
   getMyLeaves: (params = {}) => {
     const queryParams = new URLSearchParams()
-    if (params.status) queryParams.append('status', params.status)
+    // Backend expects 'status_filter' not 'status'
+    if (params.status) queryParams.append('status_filter', params.status)
     if (params.leave_type) queryParams.append('leave_type', params.leave_type)
     if (params.start_date) queryParams.append('start_date', params.start_date)
     if (params.end_date) queryParams.append('end_date', params.end_date)
-    if (params.skip) queryParams.append('skip', params.skip)
-    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.skip !== undefined) queryParams.append('skip', params.skip)
+    if (params.limit !== undefined) queryParams.append('limit', params.limit)
     
     const queryString = queryParams.toString()
     return api.get(`/api/leaves/my-leaves${queryString ? `?${queryString}` : ''}`)
@@ -66,14 +67,15 @@ export const leaveAPI = {
 export const managerAPI = {
   getAllLeaves: (params = {}) => {
     const queryParams = new URLSearchParams()
-    if (params.status) queryParams.append('status', params.status)
+    // Backend expects 'status_filter' not 'status'
+    if (params.status) queryParams.append('status_filter', params.status)
     if (params.leave_type) queryParams.append('leave_type', params.leave_type)
     if (params.start_date) queryParams.append('start_date', params.start_date)
     if (params.end_date) queryParams.append('end_date', params.end_date)
     if (params.employee_id) queryParams.append('employee_id', params.employee_id)
     if (params.department) queryParams.append('department', params.department)
-    if (params.skip) queryParams.append('skip', params.skip)
-    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.skip !== undefined) queryParams.append('skip', params.skip)
+    if (params.limit !== undefined) queryParams.append('limit', params.limit)
     
     const queryString = queryParams.toString()
     return api.get(`/api/manager/leaves${queryString ? `?${queryString}` : ''}`)

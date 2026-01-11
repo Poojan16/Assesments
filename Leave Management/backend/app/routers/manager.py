@@ -6,8 +6,7 @@ from datetime import date
 from app.database.connection import get_db
 from app.models.leave import Leave, LeaveTypeEnum, LeaveStatusEnum
 from app.models.user import User
-from app.schemas.leave import LeaveResponse, LeaveListResponse, LeaveUpdate, LeaveResponseWithUser
-from app.schemas.user import UserResponse
+from app.schemas.leave import LeaveResponse, LeaveListResponse, LeaveUpdate
 from app.utils.dependencies import get_current_user, get_current_manager
 from app.utils.exceptions import ErrorResponse
 

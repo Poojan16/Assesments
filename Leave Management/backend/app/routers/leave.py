@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import and_
 from typing import Optional
 from datetime import date
 from app.database.connection import get_db
@@ -48,9 +49,9 @@ async def apply_for_leave(
             Leave.user_id == current_user.id,
             Leave.status.in_([LeaveStatusEnum.PENDING, LeaveStatusEnum.APPROVED]),
             (
-                (Leave.start_date <= leave_data.start_date <= Leave.end_date) |
-                (Leave.start_date <= leave_data.end_date <= Leave.end_date) |
-                ((leave_data.start_date <= Leave.start_date) & (Leave.end_date <= leave_data.end_date))
+                (and_(Leave.start_date <= leave_data.start_date, leave_data.start_date <= Leave.end_date)) |
+                (and_(Leave.start_date <= leave_data.end_date, leave_data.end_date <= Leave.end_date)) |
+                (and_(leave_data.start_date <= Leave.start_date, Leave.end_date <= leave_data.end_date))
             )
         ).first()
         
@@ -154,7 +155,7 @@ async def get_my_leaves(
         return LeaveListResponse(
             success=True,
             message="Leaves retrieved successfully",
-            data=[LeaveResponse.model_validate(leave) for leave in leaves],
+            data=[LeaveResponse.model_validate(leave).model_dump() for leave in leaves],
             total=total
         )
         

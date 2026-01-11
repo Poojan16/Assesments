@@ -94,3 +94,4 @@ async def health_check():
             "service": "Leave Management System API"
         }
     }
+

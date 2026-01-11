@@ -1,14 +1,16 @@
-from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 
-class Settings(BaseSettings):
+class Settings():
     # Database settings
     DATABASE_HOST: str = "localhost"
     DATABASE_PORT: int = 3306
     DATABASE_USER: str = "poojan"
     DATABASE_PASSWORD: str = "Ronnie1627"
     DATABASE_NAME: str = "leave_management"
+    # Optional full database URL. If set, this takes precedence over individual settings.
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL")
     
     # JWT settings
     SECRET_KEY: str = "poojan@162745661521"

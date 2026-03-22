@@ -55,9 +55,12 @@ data_pipeline/
 ├── data/                         # Output of generate_data.py (auto-created)
 ├── artifacts/                    # Versioned pickle files (auto-created)
 ├── tmp/incoming/                 # Watcher download staging area (auto-created)
-├── venv/                         # Python virtual environment (auto-created)
-├── setup.sh                      # One-command bootstrap script
-├── stop.sh                       # Graceful shutdown script
+├── venv/                         # Python virtual environment (local dev only)
+├── Dockerfile                    # Container image for web + watcher services
+├── docker-compose.yml            # Orchestrates db, web, and watcher containers
+├── setup.sh                      # One-command bootstrap script (non-Docker)
+├── stop.sh                       # Graceful shutdown script (non-Docker)
+├── run_windows.bat               # Windows bootstrap script (non-Docker)
 ├── requirements.txt
 ├── .env.example
 ├── conftest.py                   # Shared pytest config + fixtures
@@ -71,16 +74,11 @@ data_pipeline/
 
 | Requirement | Version / Notes |
 |---|---|
-| Python | 3.11 or higher |
-| PostgreSQL | 14+ with the [pgvector](https://github.com/pgvector/pgvector) extension installed |
-| FTP or SFTP server | A real server, or a local mock (e.g. `pyftpdlib` for FTP, `openssh` for SFTP) |
-| Bash | Required to run `setup.sh` / `stop.sh` (Git Bash or WSL on Windows) |
+| Docker | 24+ with Docker Compose v2 (`docker compose` command) |
 | OpenAI API key | Required only if using the AI agent with `LANGCHAIN_LLM_PROVIDER=openai` |
 
-Install pgvector on PostgreSQL:
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+No local Python or PostgreSQL installation needed — everything runs inside containers.
+The `ankane/pgvector` image ships with the `vector` extension pre-installed.
 
 ---
 
@@ -88,31 +86,38 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 **Step 1 — Get the code**
 ```bash
-# Unzip or clone into any directory, then enter the project root:
 cd data_pipeline
 ```
 
 **Step 2 — Configure environment variables**
 ```bash
+# Windows
+copy .env.example .env
+
+# macOS / Linux
 cp .env.example .env
-# Open .env and fill in your real credentials before continuing
 ```
+Open `.env` and fill in your real credentials (DB password, OpenAI key, FTP details) before continuing.
 
-**Step 3 — Run setup.sh**
+**Step 3 — Build and start all services**
 ```bash
-bash setup.sh
+docker compose up --build
 ```
 
-`setup.sh` does the following in order:
+This single command:
+1. Pulls `ankane/pgvector` (PostgreSQL 15 + pgvector extension)
+2. Builds the `web` and `watcher` images from `Dockerfile`
+3. Waits for the database to be healthy
+4. Runs Django migrations (`manage.py migrate`)
+5. Generates 5 000 rows of synthetic sample data (`data/sample_transactions.xlsx`)
+6. Starts the Django development server on port **8000**
+7. Starts the FTP/SFTP watcher in a separate container
 
-1. Creates a Python virtual environment at `data_pipeline/venv/`
-2. Activates the venv and upgrades pip
-3. Installs **all packages from `requirements.txt` inside the venv** — nothing is installed globally
-4. Copies `.env.example` → `.env` if `.env` does not already exist
-5. Runs Django database migrations (`manage.py migrate`)
-6. Starts the Django development server on port 8000 in the background
-7. Starts the FTP/SFTP watcher in the background
-8. Saves both process PIDs to `/tmp/pipeline.pids` for clean shutdown
+**Step 4 — Stop everything**
+```bash
+docker compose down
+```
+Add `-v` to also delete the PostgreSQL volume: `docker compose down -v`
 
 ---
 
@@ -146,51 +151,54 @@ All variables are read from `.env` (loaded via `python-dotenv`). Copy `.env.exam
 
 ## 6. How to Run
 
-**Start everything (venv + migrations + Django + watcher)**
+**Start all services**
 ```bash
-bash setup.sh
+docker compose up --build
 ```
 
-**Stop everything gracefully**
+**Start in detached (background) mode**
 ```bash
-bash stop.sh
-# Sends SIGTERM to Django and the watcher, then removes /tmp/pipeline.pids
+docker compose up --build -d
+```
+
+**Stop all services**
+```bash
+docker compose down
 ```
 
 **Generate synthetic test data**
 ```bash
-venv/bin/python generate_data.py --rows 5000
+docker compose exec web python generate_data.py --rows 5000
 # Output: data/sample_transactions.xlsx
 ```
 
 **Run the pipeline manually for a specific file**
 ```bash
-cd dashboard
-../venv/bin/python manage.py run_pipeline --file ../data/sample_transactions.xlsx
+docker compose exec web python dashboard/manage.py run_pipeline --file data/sample_transactions.xlsx
 ```
 
 **Run the watcher standalone**
 ```bash
-venv/bin/python watcher/ftp_watcher.py
+docker compose exec watcher python watcher/ftp_watcher.py
 # Polls every WATCHER_POLL_INTERVAL seconds; Ctrl-C to stop cleanly
 ```
 
 **Run the AI agent (CLI, multi-turn)**
 ```bash
-venv/bin/python ai/langchain_agent.py --question "Which accounts spiked this week?"
+docker compose exec web python ai/langchain_agent.py --question "Which accounts spiked this week?"
 # After the first answer, type follow-up questions interactively
 # Ctrl-C to exit
+```
+
+**Dashboard UI**
+```
+GET http://localhost:8000/dashboard/
 ```
 
 **AI insights via HTTP**
 ```
 GET http://localhost:8000/dashboard/insights/
 → {"insights": "## Analysis\n..."}
-```
-
-**Dashboard UI**
-```
-GET http://localhost:8000/dashboard/
 ```
 
 **Trigger pipeline via HTTP**
@@ -201,13 +209,19 @@ POST http://localhost:8000/dashboard/trigger/?file=sample_transactions.xlsx
 
 **Run all tests**
 ```bash
-venv/bin/pytest tests/
+docker compose exec web pytest tests/
 # PostgreSQL tests auto-skip if DB env vars are not set
 ```
 
 **Run a single test file**
 ```bash
-venv/bin/pytest tests/test_pickle_integrity.py -v
+docker compose exec web pytest tests/test_pickle_integrity.py -v
+```
+
+**View live logs**
+```bash
+docker compose logs -f web
+docker compose logs -f watcher
 ```
 
 ---

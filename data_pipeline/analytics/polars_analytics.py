@@ -124,7 +124,18 @@ def run_analytics(df: pd.DataFrame) -> pl.DataFrame:
         ``txn_count``, ``rolling_7d_sum``.
     """
     log.info("Converting pandas DataFrame (%d rows) to Polars LazyFrame.", len(df))
-    lf: pl.LazyFrame = pl.from_pandas(df).lazy()
+    # Build Polars DataFrame column-by-column to avoid pyarrow bridge issues
+    # with pandas 3.x Arrow-backed StringDtype and DatetimeTZDtype.
+    pl_data = {}
+    for col in df.columns:
+        s = df[col]
+        if isinstance(s.dtype, pd.StringDtype) or pd.api.types.is_object_dtype(s):
+            pl_data[col] = pl.Series(col, s.to_numpy(dtype=object, na_value=None), dtype=pl.Utf8)
+        elif isinstance(s.dtype, pd.DatetimeTZDtype):
+            pl_data[col] = pl.Series(col, s.dt.tz_convert("UTC").to_numpy(dtype="datetime64[us]", na_value=None), dtype=pl.Datetime("us", "UTC"))
+        else:
+            pl_data[col] = pl.Series(col, s.to_numpy(na_value=None))
+    lf: pl.LazyFrame = pl.DataFrame(pl_data).lazy()
 
     lf = _step_filter(lf)
     log.info("Step 1 — filter applied (amount > 0).")

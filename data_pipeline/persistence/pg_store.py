@@ -9,7 +9,6 @@ import pandas as pd
 import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import connection as PgConnection
-from sentence_transformers import SentenceTransformer
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ _EMBEDDING_DIM = 128
 _MODEL_NAME = "all-MiniLM-L6-v2"  # native output: 384 dims → truncated to 128
 
 # Module-level model cache — loaded once, reused across calls
-_model: SentenceTransformer | None = None
+_model = None
 
 
 # ── DB connection ─────────────────────────────────────────────────────────────
@@ -76,7 +75,7 @@ def ensure_schema(conn: PgConnection) -> None:
 
 # ── Embedding helpers ─────────────────────────────────────────────────────────
 
-def _get_model() -> SentenceTransformer:
+def _get_model():
     """Return the cached :class:`SentenceTransformer` model, loading it once.
 
     Returns:
@@ -84,6 +83,7 @@ def _get_model() -> SentenceTransformer:
     """
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         log.info("Loading sentence-transformer model '%s' …", _MODEL_NAME)
         _model = SentenceTransformer(_MODEL_NAME)
         log.info("Model loaded.")
@@ -141,21 +141,25 @@ def insert_dataframe(df: pd.DataFrame, conn: PgConnection) -> None:
         (
             str(row.txn_id),
             str(row.account_id),
-            row.txn_ts.isoformat() if pd.notna(row.txn_ts) else None,
+            row.txn_ts.isoformat(),
             float(row.amount) if pd.notna(row.amount) else None,
             row.currency if pd.notna(row.currency) else None,
             row.narration if pd.notna(row.narration) else None,
             embeddings[i].tolist(),
         )
         for i, row in enumerate(df.itertuples(index=False))
+        if pd.notna(row.txn_ts)
     ]
 
+    skipped = len(df) - len(rows)
+    if skipped:
+        log.warning("Skipping %d row(s) with null txn_ts.", skipped)
     total = len(rows)
     inserted = 0
     with conn.cursor() as cur:
         for start in range(0, total, _BATCH_SIZE):
             batch = rows[start : start + _BATCH_SIZE]
-            psycopg2.extras.execute_many(cur, sql, batch)
+            psycopg2.extras.execute_batch(cur, sql, batch)
             conn.commit()
             inserted += len(batch)
             log.info("Inserted batch %d–%d / %d", start + 1, inserted, total)

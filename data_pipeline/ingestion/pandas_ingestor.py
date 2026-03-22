@@ -37,14 +37,27 @@ def _parse_utc_timestamp(series: pd.Series) -> pd.Series:
         A :class:`pandas.Series` of ``datetime64[ns, UTC]``, with
         unparseable values as ``NaT``.
     """
+    _FORMATS = [
+        "%d-%m-%Y",
+        "%d/%m/%Y",
+        "%d-%m-%Y %H:%M:%S",
+        "%Y-%m-%d",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S.%f%z",
+    ]
+
     def _to_utc(val: object) -> "pd.Timestamp | pd.NaT":
-        try:
-            ts = pd.to_datetime(val, utc=False)
-            if ts.tzinfo is None:
-                return ts.tz_localize("UTC")
-            return ts.tz_convert("UTC")
-        except Exception:
-            return pd.NaT
+        for fmt in _FORMATS:
+            try:
+                ts = pd.to_datetime(val, format=fmt)
+                if ts.tzinfo is None:
+                    return ts.tz_localize("UTC")
+                return ts.tz_convert("UTC")
+            except Exception:
+                continue
+        return pd.NaT
 
     parsed = series.map(_to_utc)
     nat_count = parsed.isna().sum()

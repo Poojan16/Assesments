@@ -10,13 +10,36 @@ import uuid
 import pandas as pd
 import pytest
 
-# Skip the entire module if DB credentials are not configured
+
+def _pg_available() -> bool:
+    """Return True only if all DB env vars are set, the DB is reachable, and sentence_transformers is installed."""
+    required = ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD")
+    if not all(os.environ.get(v) for v in required):
+        return False
+    try:
+        import sentence_transformers  # noqa: F401
+    except ImportError:
+        return False
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.environ["DB_HOST"],
+            port=int(os.environ["DB_PORT"]),
+            dbname=os.environ["DB_NAME"],
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            connect_timeout=3,
+        )
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+# Skip the entire module if DB is not available
 pytestmark = pytest.mark.skipif(
-    not all(
-        os.environ.get(v)
-        for v in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD")
-    ),
-    reason="PostgreSQL env vars not set — skipping pg idempotency test.",
+    not _pg_available(),
+    reason="PostgreSQL not reachable — skipping pg idempotency test.",
 )
 
 

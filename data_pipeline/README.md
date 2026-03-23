@@ -172,6 +172,28 @@ docker compose exec web python generate_data.py --rows 5000
 # Output: data/sample_transactions.xlsx
 ```
 
+**Generate a full scenario suite (happy path + edge cases)**
+```bash
+docker compose exec web python generate_data.py --scenario suite --rows 5000 --output data/
+# Outputs:
+# data/sample_transactions_happy.xlsx
+# data/sample_transactions_balanced.xlsx
+# data/sample_transactions_noisy.xlsx
+# data/sample_transactions_idempotency.xlsx
+```
+
+**Generate a custom stress file (single mode with tunable anomaly rates)**
+```bash
+docker compose exec web python generate_data.py \
+  --scenario single \
+  --rows 10000 \
+  --output data/sample_transactions_stress.xlsx \
+  --malformed-ts-rate 0.30 \
+  --null-amount-rate 0.12 \
+  --duplicate-txn-rate 0.08 \
+  --invalid-currency-rate 0.10
+```
+
 **Run the pipeline manually for a specific file**
 ```bash
 docker compose exec web python dashboard/manage.py run_pipeline --file data/sample_transactions.xlsx

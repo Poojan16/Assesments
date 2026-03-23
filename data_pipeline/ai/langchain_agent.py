@@ -28,7 +28,9 @@ from langchain.prompts import PromptTemplate
 from langchain.schema.output_parser import StrOutputParser
 from langgraph.graph import END, StateGraph
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+# Prefer latest values from repo .env (useful in local/dev Docker workflows
+# where env files may be updated between runs).
+load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 # Ensure data_pipeline/ root is importable
 _ROOT = Path(__file__).resolve().parent.parent
@@ -79,10 +81,16 @@ def _build_llm() -> Any:
     provider = os.environ.get("LANGCHAIN_LLM_PROVIDER", "openai").lower()
     if provider == "openai":
         from langchain_openai import ChatOpenAI
+        raw_key = os.environ.get("OPENAI_API_KEY", "")
+        api_key = raw_key.strip().strip('"').strip("'")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY is missing. Set it in .env and restart the web service."
+            )
         return ChatOpenAI(
             model="gpt-4o-mini",
             temperature=0.2,
-            api_key=os.environ.get("OPENAI_API_KEY"),
+            api_key=api_key,
         )
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic  # type: ignore[import]

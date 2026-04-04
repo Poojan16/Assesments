@@ -308,3 +308,80 @@ The CLI memory object lives at module scope so it persists across `run_agent()` 
 | No authentication on Django endpoints | Add Django's built-in session auth or token auth (DRF `TokenAuthentication`) before any public deployment |
 | Tests for the AI agent require a live LLM API key | Add a `pytest` fixture that mocks `_build_llm()` with a `FakeLLM` so the graph topology can be tested offline |
 | `rolling_sum` uses index-based windows (one row = one day) | Switch to a true time-based rolling window (`rolling` with `period="7d"`) to handle missing days correctly |
+
+---
+
+## 10. Bash Scripts (Non-Docker)
+
+These scripts provide a pure-bash alternative to Docker Compose for local development on Ubuntu/Debian.
+
+### setup.sh — one-time bootstrap
+
+Creates the venv, installs dependencies, runs migrations, validates required env vars, and seeds initial data. Run once before `start.sh`.
+
+| Env var | Default | Description |
+|---|---|---|
+| `VENV_DIR` | `./venv` | Virtual-environment directory |
+| `SEED_ROWS` | `5000` | Rows to generate for seed data |
+| `SEED_OUTPUT` | `./data/sample_transactions.xlsx` | Seed file output path |
+| `DJANGO_SETTINGS_MODULE` | `dashboard.settings` | Django settings module |
+
+```bash
+cp .env.example .env   # fill in credentials first
+./setup.sh
+./setup.sh --help
+```
+
+### start.sh — start web server + watcher
+
+Starts Django and the FTP/SFTP watcher as background processes. PIDs are written to `$PID_DIR`; stdout/stderr of each service goes to `$LOG_DIR/<service>.log`. Prints a startup summary on exit.
+
+| Env var | Default | Description |
+|---|---|---|
+| `APP_PORT` | `8000` | Django listen port |
+| `LOG_DIR` | `./logs` | Per-service log files |
+| `PID_DIR` | `./run` | PID files (`web.pid`, `watcher.pid`) |
+| `VENV_DIR` | `./venv` | Virtual-environment path |
+
+```bash
+./start.sh
+./start.sh --help
+
+# Tail logs live
+tail -f logs/web.log
+tail -f logs/watcher.log
+```
+
+### stop.sh — graceful shutdown
+
+Sends SIGTERM to both processes; escalates to SIGKILL after `$STOP_TIMEOUT` seconds if they haven't exited. Cleans up PID files.
+
+| Env var | Default | Description |
+|---|---|---|
+| `PID_DIR` | `./run` | Directory containing PID files |
+| `STOP_TIMEOUT` | `10` | Seconds before SIGKILL escalation |
+
+```bash
+./stop.sh
+./stop.sh --help
+```
+
+### ops.sh — archive maintenance
+
+Moves `.xlsx` files older than `$DATA_RETAIN_DAYS` days from `$DATA_DIR` into a timestamped `tar.gz` under `$ARCHIVE_DIR`, deletes the originals, then purges archives older than `$ARCHIVE_RETAIN_DAYS` days. Prints a human-readable summary. Safe to run from cron.
+
+| Env var | Default | Description |
+|---|---|---|
+| `DATA_DIR` | `./data` | Source directory of processed `.xlsx` files |
+| `ARCHIVE_DIR` | `./archives` | Destination for compressed archives |
+| `LOG_DIR` | `./logs` | Ops log directory |
+| `DATA_RETAIN_DAYS` | `7` | Archive originals older than N days |
+| `ARCHIVE_RETAIN_DAYS` | `30` | Purge archives older than N days |
+
+```bash
+./ops.sh
+./ops.sh --help
+
+# Cron: run daily at 02:00
+# 0 2 * * * /path/to/data_pipeline/ops.sh >> /var/log/data_pipeline_ops.log 2>&1
+```

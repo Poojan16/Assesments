@@ -1,6 +1,6 @@
 pandas==2.2.1
 openpyxl==3.1.2
-polars==0.20.15
+polars-lts-cpu==0.20.15
 psycopg2-binary==2.9.9
 pgvector==0.2.4
 Django==5.0.3

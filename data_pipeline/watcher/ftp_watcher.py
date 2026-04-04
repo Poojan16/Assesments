@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import signal
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,19 +35,18 @@ _INCOMING_DIR = _BASE / "tmp" / "incoming"
 _STATE_FILE = Path(__file__).parent / "processed_files.json"
 
 # ── Shutdown flag ─────────────────────────────────────────────────────────────
-_shutdown = False
+_shutdown = threading.Event()
 
 
 def _handle_signal(signum: int, frame: object) -> None:
-    """Set the global shutdown flag on SIGTERM or SIGINT.
+    """Set the shutdown event on SIGTERM or SIGINT.
 
     Args:
         signum: Signal number received.
         frame: Current stack frame (unused).
     """
-    global _shutdown
     log.info("Signal %d received — finishing current file then exiting.", signum)
-    _shutdown = True
+    _shutdown.set()
 
 
 signal.signal(signal.SIGTERM, _handle_signal)
@@ -123,22 +123,34 @@ def _mark_processed(state: dict[str, Any], filename: str, checksum: str) -> None
 
 # ── FTP / SFTP download ───────────────────────────────────────────────────────
 
+def _ftp_connect() -> ftplib.FTP_TLS:
+    """Create an authenticated, TLS-protected FTP connection.
+
+    Returns:
+        An open ``FTP_TLS`` instance with the data channel protected (PROT P)
+        and the remote directory already set.
+    """
+    ftp = ftplib.FTP_TLS()
+    ftp.connect(
+        host=os.environ["FTP_HOST"],
+        port=int(os.environ.get("FTP_PORT", 21)),
+    )
+    ftp.login(
+        user=os.environ["FTP_USER"],
+        passwd=os.environ["FTP_PASSWORD"],
+    )
+    ftp.prot_p()  # encrypt the data channel
+    ftp.cwd(os.environ["FTP_REMOTE_DIR"])
+    return ftp
+
+
 def _list_ftp() -> list[str]:
     """List ``.xlsx`` files in the FTP remote directory.
 
     Returns:
         List of filenames (not full paths).
     """
-    with ftplib.FTP() as ftp:
-        ftp.connect(
-            host=os.environ["FTP_HOST"],
-            port=int(os.environ.get("FTP_PORT", 21)),
-        )
-        ftp.login(
-            user=os.environ["FTP_USER"],
-            passwd=os.environ["FTP_PASSWORD"],
-        )
-        ftp.cwd(os.environ["FTP_REMOTE_DIR"])
+    with _ftp_connect() as ftp:
         files = [f for f in ftp.nlst() if f.endswith(".xlsx")]
     log.info("FTP: found %d .xlsx file(s).", len(files))
     return files
@@ -151,16 +163,7 @@ def _download_ftp(filename: str, dest: Path) -> None:
         filename: Name of the remote file.
         dest: Local destination path.
     """
-    with ftplib.FTP() as ftp:
-        ftp.connect(
-            host=os.environ["FTP_HOST"],
-            port=int(os.environ.get("FTP_PORT", 21)),
-        )
-        ftp.login(
-            user=os.environ["FTP_USER"],
-            passwd=os.environ["FTP_PASSWORD"],
-        )
-        ftp.cwd(os.environ["FTP_REMOTE_DIR"])
+    with _ftp_connect() as ftp:
         with dest.open("wb") as fh:
             ftp.retrbinary(f"RETR {filename}", fh.write)
     log.info("FTP: downloaded '%s' → %s", filename, dest)
@@ -295,7 +298,7 @@ def _poll_once(mode: str, state: dict[str, Any]) -> None:
     _INCOMING_DIR.mkdir(parents=True, exist_ok=True)
 
     for filename in remote_files:
-        if _shutdown:
+        if _shutdown.is_set():
             break
 
         dest = _INCOMING_DIR / filename
@@ -334,12 +337,12 @@ def run() -> None:
     log.info("Watcher starting — mode=%s, interval=%ds", mode, interval)
     state = _load_state()
 
-    while not _shutdown:
+    while not _shutdown.is_set():
         log.info("Polling remote directory …")
         _poll_once(mode, state)
-        if not _shutdown:
+        if not _shutdown.is_set():
             log.info("Sleeping %ds until next poll.", interval)
-            time.sleep(interval)
+            _shutdown.wait(timeout=interval)  # wakes immediately on signal
 
     log.info("Watcher shut down cleanly.")
 

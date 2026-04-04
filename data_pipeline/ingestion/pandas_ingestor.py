@@ -18,6 +18,7 @@ class SchemaValidationError(Exception):
     """Raised when the ingested file is missing one or more required columns."""
 
 
+
 class DataTypeError(Exception):
     """Raised when a column cannot be coerced to its expected dtype."""
 
